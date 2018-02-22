@@ -1,6 +1,6 @@
 ## Implementation of Quill editor Delta format in Dart.
 
-See official [documentation][] for more details:
+See official [documentation][] for more details.
 
 [documentation]: https://quilljs.com/docs/delta/
 
