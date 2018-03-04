@@ -76,8 +76,10 @@ class Operation {
   }
 
   bool _compareAttributes(Map<String, dynamic> otherAttributes) {
-    MapEquality<String, dynamic> comparator =
-        new MapEquality<String, dynamic>();
+    final comparator = new MapEquality<String, dynamic>(
+      keys: const DefaultEquality<String>(),
+      values: const DefaultEquality<dynamic>(),
+    );
     return comparator.equals(attributes, otherAttributes);
   }
 
@@ -171,7 +173,8 @@ class Delta {
     if (identical(this, other)) return true;
     if (other is! Delta) return false;
     Delta typedOther = other;
-    ListEquality<Operation> comparator = new ListEquality<Operation>();
+    final comparator =
+        new ListEquality<Operation>(const DefaultEquality<Operation>());
     return comparator.equals(operations, typedOther.operations);
   }
 
