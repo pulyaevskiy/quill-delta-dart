@@ -1,3 +1,6 @@
+// Copyright (c) 2018, Anatoly Pulyaevskiy. All rights reserved. Use of this source code
+// is governed by a BSD-style license that can be found in the LICENSE file.
+
 /// Implementation of Quill Delta format in Dart.
 library delta;
 
@@ -106,6 +109,7 @@ class Operation {
   }
 }
 
+/// Transform two attribute sets.
 Map<String, dynamic> transformAttributes(
     Map<String, dynamic> a, Map<String, dynamic> b, bool priority) {
   if (a == null) return b;
@@ -271,8 +275,7 @@ class Delta {
   /// Returns new operation or `null` if operations from [thisIter] and
   /// [otherIter] nullify each other. For instance, for the pair `insert('abc')`
   /// and `delete(3)` composition result would be no-op.
-  Operation _composeOperation(
-      Delta2DIterator thisIter, Delta2DIterator otherIter) {
+  Operation _composeOperation(DeltaIterator thisIter, DeltaIterator otherIter) {
     if (otherIter.isNextInsert) return otherIter.next();
     if (thisIter.isNextDelete) return thisIter.next();
 
@@ -310,8 +313,8 @@ class Delta {
   /// delta (consisting only of insert operations).
   Delta compose(Delta other) {
     final Delta result = new Delta();
-    Delta2DIterator thisIter = new Delta2DIterator(this);
-    Delta2DIterator otherIter = new Delta2DIterator(other);
+    DeltaIterator thisIter = new DeltaIterator(this);
+    DeltaIterator otherIter = new DeltaIterator(other);
 
     while (thisIter.hasNext || otherIter.hasNext) {
       final Operation newOp = _composeOperation(thisIter, otherIter);
@@ -325,7 +328,7 @@ class Delta {
   ///
   /// Returns `null` if both operations nullify each other.
   Operation _transformOperation(
-      Delta2DIterator thisIter, Delta2DIterator otherIter, bool priority) {
+      DeltaIterator thisIter, DeltaIterator otherIter, bool priority) {
     if (thisIter.isNextInsert && (priority || !otherIter.isNextInsert)) {
       return new Operation.retain(thisIter.next().length);
     } else if (otherIter.isNextInsert) {
@@ -356,8 +359,8 @@ class Delta {
   /// Transforms [other] delta against operations in this delta.
   Delta transform(Delta other, bool priority) {
     final Delta result = new Delta();
-    Delta2DIterator thisIter = new Delta2DIterator(this);
-    Delta2DIterator otherIter = new Delta2DIterator(other);
+    DeltaIterator thisIter = new DeltaIterator(this);
+    DeltaIterator otherIter = new DeltaIterator(other);
 
     while (thisIter.hasNext || otherIter.hasNext) {
       final Operation newOp =
@@ -390,13 +393,13 @@ class Delta {
   String toString() => '$Delta$operations';
 }
 
-class Delta2DIterator {
+class DeltaIterator {
   final Delta delta;
   int _index = 0;
   num _offset = 0;
   int _modificationCount;
 
-  Delta2DIterator(this.delta) : _modificationCount = delta._modificationCount;
+  DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
   bool get isNextInsert => nextOpKey == 'insert';
   bool get isNextDelete => nextOpKey == 'delete';

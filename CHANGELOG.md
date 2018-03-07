@@ -1,3 +1,3 @@
 ## 0.1.0
 
-- Initial version, created by Stagehand
+- Initial port of official library.
