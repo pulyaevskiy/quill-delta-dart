@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 // Copyright (c) 2018, Anatoly Pulyaevskiy. All rights reserved. Use of this source code
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
@@ -72,7 +74,7 @@ void main() {
 
   group('Operation', () {
     test('insert factory', () {
-      final op = new Operation.insert('a', attributes: const {'b': '1'});
+      final op = new Operation.insert('a', const {'b': '1'});
       expect(op.isInsert, isTrue);
       expect(op.length, 1);
       expect(op.attributes, const {'b': '1'});
@@ -86,7 +88,7 @@ void main() {
     });
 
     test('retain factory', () {
-      final op = new Operation.retain(5, attributes: const {'b': '1'});
+      final op = new Operation.retain(5, const {'b': '1'});
       expect(op.isRetain, isTrue);
       expect(op.length, 5);
       expect(op.attributes, const {'b': '1'});
@@ -96,7 +98,7 @@ void main() {
       final op2 = new Operation.retain(1);
       final op3 = new Operation.insert('a');
       final op4 = new Operation.delete(1);
-      final op8 = new Operation.retain(1, attributes: const {'b': '1'});
+      final op8 = new Operation.retain(1, const {'b': '1'});
       expect(op2.isNoOp, isTrue);
       expect(op3.isNoOp, isFalse);
       expect(op4.isNoOp, isFalse);
@@ -105,10 +107,8 @@ void main() {
 
     test('equality', () {
       final op1 = new Operation.insert('a');
-      final op2 =
-          new Operation.insert('b', attributes: const {'h': '1', 'b': 'true'});
-      final op3 =
-          new Operation.insert('b', attributes: const {'h': 'true', 'b': '1'});
+      final op2 = new Operation.insert('b', const {'h': '1', 'b': 'true'});
+      final op3 = new Operation.insert('b', const {'h': 'true', 'b': '1'});
       final op4 = new Operation.insert('a');
       expect(op1, isNot(op2));
       expect(op2, isNot(op3));
@@ -116,12 +116,9 @@ void main() {
     });
 
     test('hashCode', () {
-      final op1 =
-          new Operation.insert('b', attributes: const {'h': '1', 'b': 'true'});
-      final op2 =
-          new Operation.insert('b', attributes: const {'h': '1', 'b': 'true'});
-      final op3 =
-          new Operation.insert('b', attributes: const {'h': 'true', 'b': '1'});
+      final op1 = new Operation.insert('b', const {'h': '1', 'b': 'true'});
+      final op2 = new Operation.insert('b', const {'h': '1', 'b': 'true'});
+      final op3 = new Operation.insert('b', const {'h': 'true', 'b': '1'});
       expect(op2.hashCode, isNot(op3.hashCode));
       expect(op2.hashCode, op1.hashCode);
     });
@@ -138,6 +135,14 @@ void main() {
       expect(delta.isNoOp, isTrue);
       delta.retain(1);
       expect(delta.isNoOp, isTrue);
+    });
+
+    test('json', () {
+      final delta = new Delta()..insert('abc', {'bold': true});
+      final result = json.encode(delta);
+      expect(result, '[{"insert":"abc","attributes":{"bold":true}}]');
+      final decoded = Delta.fromJson(json.decode(result));
+      expect(decoded, delta);
     });
 
     group('push', () {
@@ -214,20 +219,18 @@ void main() {
 
       test('consequent inserts with different attributes do not merge', () {
         final delta = new Delta()
-          ..insert('abc', attributes: const {'b': 'true'})
+          ..insert('abc', const {'b': 'true'})
           ..insert('123');
         expect(delta.operations, [
-          new Operation.insert('abc', attributes: const {'b': 'true'}),
+          new Operation.insert('abc', const {'b': 'true'}),
           new Operation.insert('123'),
         ]);
       });
 
       test('consequent retain with different attributes do not merge', () {
-        final delta = new Delta()
-          ..retain(5, attributes: const {'b': '1'})
-          ..retain(3);
+        final delta = new Delta()..retain(5, const {'b': '1'})..retain(3);
         expect(delta.operations, [
-          new Operation.retain(5, attributes: const {'b': '1'}),
+          new Operation.retain(5, const {'b': '1'}),
           new Operation.retain(3),
         ]);
       });
@@ -251,9 +254,9 @@ void main() {
 
       test('insert + retain', () {
         final a = new Delta()..insert('A');
-        final b = new Delta()..retain(1, attributes: const {'b': '1'});
+        final b = new Delta()..retain(1, const {'b': '1'});
         expect(a.compose(b).operations, [
-          new Operation.insert('A', attributes: const {'b': '1'})
+          new Operation.insert('A', const {'b': '1'})
         ]);
       });
 
@@ -277,37 +280,36 @@ void main() {
 
       test('delete + retain', () {
         final a = new Delta()..delete(1);
-        final b = new Delta()..retain(1, attributes: const {'b': '1'});
+        final b = new Delta()..retain(1, const {'b': '1'});
         final expected = new Delta()
           ..delete(1)
-          ..retain(1, attributes: const {'b': '1'});
+          ..retain(1, const {'b': '1'});
         expect(a.compose(b).operations, expected.operations);
       });
 
       // ==== retain combinations ====
 
       test('retain + insert', () {
-        final a = new Delta()..retain(1, attributes: const {'b': '1'});
+        final a = new Delta()..retain(1, const {'b': '1'});
         final b = new Delta()..insert('B');
         final expected = new Delta()
           ..insert('B')
-          ..retain(1, attributes: const {'b': '1'});
+          ..retain(1, const {'b': '1'});
         expect(a.compose(b).operations, expected.operations);
       });
 
       test('retain + delete', () {
-        final a = new Delta()..retain(1, attributes: const {'b': '1'});
+        final a = new Delta()..retain(1, const {'b': '1'});
         final b = new Delta()..delete(1);
         final expected = new Delta()..delete(1);
         expect(a.compose(b).operations, expected.operations);
       });
 
       test('retain + retain', () {
-        final a = new Delta()..retain(1, attributes: const {'color': 'blue'});
-        final b = new Delta()
-          ..retain(1, attributes: const {'color': 'red', 'b': '1'});
+        final a = new Delta()..retain(1, const {'color': 'blue'});
+        final b = new Delta()..retain(1, const {'color': 'red', 'b': '1'});
         final expected = new Delta()
-          ..retain(1, attributes: const {'color': 'red', 'b': '1'});
+          ..retain(1, const {'color': 'red', 'b': '1'});
         expect(a.compose(b).operations, expected.operations);
       });
 
@@ -355,8 +357,8 @@ void main() {
       });
 
       test('remove all attributes', () {
-        final a = new Delta()..insert('A', attributes: const {'b': '1'});
-        final b = new Delta()..retain(1, attributes: const {'b': null});
+        final a = new Delta()..insert('A', const {'b': '1'});
+        final b = new Delta()..retain(1, const {'b': null});
         final expected = new Delta()..insert('A');
         expect(a.compose(b).operations, expected.operations);
       });
@@ -378,11 +380,10 @@ void main() {
 
       test('insert + retain', () {
         var a = new Delta()..insert('A');
-        var b = new Delta()
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
+        var b = new Delta()..retain(1, const {'bold': '1', 'color': 'red'});
         var expected = new Delta()
           ..retain(1)
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
+          ..retain(1, const {'bold': '1', 'color': 'red'});
         expect(a.transform(b, true).operations, expected.operations);
       });
 
@@ -404,8 +405,7 @@ void main() {
 
       test('delete + retain', () {
         var a = new Delta()..delete(1);
-        var b = new Delta()
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
+        var b = new Delta()..retain(1, const {'bold': '1', 'color': 'red'});
         var expected = new Delta();
         expect(a.transform(b, true).operations, expected.operations);
       });
@@ -418,42 +418,37 @@ void main() {
       });
 
       test('retain + insert', () {
-        var a = new Delta()..retain(1, attributes: const {'color': 'blue'});
+        var a = new Delta()..retain(1, const {'color': 'blue'});
         var b = new Delta()..insert('B');
         var expected = new Delta()..insert('B');
         expect(a.transform(b, true).operations, expected.operations);
       });
 
       test('retain + retain', () {
-        var a1 = new Delta()..retain(1, attributes: const {'color': 'blue'});
-        var b1 = new Delta()
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
-        var a2 = new Delta()..retain(1, attributes: const {'color': 'blue'});
-        var b2 = new Delta()
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
-        var expected1 = new Delta()..retain(1, attributes: const {'bold': '1'});
+        var a1 = new Delta()..retain(1, const {'color': 'blue'});
+        var b1 = new Delta()..retain(1, const {'bold': '1', 'color': 'red'});
+        var a2 = new Delta()..retain(1, const {'color': 'blue'});
+        var b2 = new Delta()..retain(1, const {'bold': '1', 'color': 'red'});
+        var expected1 = new Delta()..retain(1, const {'bold': '1'});
         var expected2 = new Delta();
         expect(a1.transform(b1, true).operations, expected1.operations);
         expect(b2.transform(a2, true).operations, expected2.operations);
       });
 
       test('retain + retain without priority', () {
-        var a1 = new Delta()..retain(1, attributes: const {'color': 'blue'});
-        var b1 = new Delta()
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
-        var a2 = new Delta()..retain(1, attributes: const {'color': 'blue'});
-        var b2 = new Delta()
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
+        var a1 = new Delta()..retain(1, const {'color': 'blue'});
+        var b1 = new Delta()..retain(1, const {'bold': '1', 'color': 'red'});
+        var a2 = new Delta()..retain(1, const {'color': 'blue'});
+        var b2 = new Delta()..retain(1, const {'bold': '1', 'color': 'red'});
         var expected1 = new Delta()
-          ..retain(1, attributes: const {'bold': '1', 'color': 'red'});
-        var expected2 = new Delta()
-          ..retain(1, attributes: const {'color': 'blue'});
+          ..retain(1, const {'bold': '1', 'color': 'red'});
+        var expected2 = new Delta()..retain(1, const {'color': 'blue'});
         expect(a1.transform(b1, false).operations, expected1.operations);
         expect(b2.transform(a2, false).operations, expected2.operations);
       });
 
       test('retain + delete', () {
-        var a = new Delta()..retain(1, attributes: const {'color': 'blue'});
+        var a = new Delta()..retain(1, const {'color': 'blue'});
         var b = new Delta()..delete(1);
         var expected = new Delta()..delete(1);
         expect(a.transform(b, true).operations, expected.operations);

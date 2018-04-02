@@ -5,6 +5,7 @@
 library delta;
 
 import 'dart:math' as math;
+
 import 'package:collection/collection.dart';
 import 'package:quiver_hashcode/hashcode.dart';
 
@@ -25,28 +26,35 @@ class Operation {
   Operation._(this.key, this.length, this.data, this.attributes)
       : assert(key != null && length != null && data != null);
 
-  factory Operation.fromMap(Map<String, dynamic> values) {
-    if (values.containsKey('insert')) {
-      final String data = values['insert'];
-      return new Operation._('insert', data.length, data, values['attributes']);
-    } else if (values.containsKey('delete')) {
-      final int length = values['delete'];
+  static Operation fromJson(values) {
+    final map = new Map<String, dynamic>.from(values);
+    if (map.containsKey('insert')) {
+      final String text = map['insert'];
+      return new Operation._('insert', text.length, text, map['attributes']);
+    } else if (map.containsKey('delete')) {
+      final int length = map['delete'];
       return new Operation._('delete', length, '', null);
-    } else if (values.containsKey('retain')) {
-      final int length = values['retain'];
-      return new Operation._('retain', length, '', values['attributes']);
+    } else if (map.containsKey('retain')) {
+      final int length = map['retain'];
+      return new Operation._('retain', length, '', map['attributes']);
     }
     throw new ArgumentError.value(
         values, 'Invalid values for Delta operation.');
   }
 
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> json = {key: value};
+    if (attributes != null) json['attributes'] = attributes;
+    return json;
+  }
+
   factory Operation.delete(int length) =>
       new Operation._('delete', length, '', null);
 
-  factory Operation.insert(String text, {Map<String, dynamic> attributes}) =>
+  factory Operation.insert(String text, [Map<String, dynamic> attributes]) =>
       new Operation._('insert', text.length, text, attributes);
 
-  factory Operation.retain(int length, {Map<String, dynamic> attributes}) =>
+  factory Operation.retain(int length, [Map<String, dynamic> attributes]) =>
       new Operation._('retain', length, '', attributes);
 
   /// Value of this operation. For insert operations this returns text,
@@ -100,12 +108,6 @@ class Operation {
   String toString() {
     String attr = attributes == null ? '' : ', $attributes';
     return isInsert ? '$key("$value"$attr)' : '$key($value$attr)';
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> json = {key: value};
-    if (attributes != null) json['attributes'] = attributes;
-    return json;
   }
 }
 
@@ -168,6 +170,12 @@ class Delta {
   factory Delta.fromOperations(List<Operation> operations) =>
       new Delta._(operations);
 
+  static Delta fromJson(List data) {
+    return new Delta._(data.map(Operation.fromJson).toList());
+  }
+
+  List toJson() => operations;
+
   /// Returns `true` if this delta does not contain mutating operations.
   bool get isNoOp =>
       _operations.isEmpty || _operations.every((op) => op.isNoOp);
@@ -186,17 +194,17 @@ class Delta {
   int get hashCode => hashObjects(operations);
 
   /// Retain [count] of characters.
-  void retain(int count, {Map<String, dynamic> attributes}) {
+  void retain(int count, [Map<String, dynamic> attributes]) {
     assert(count >= 0);
     if (count == 0) return; // no-op
-    push(new Operation.retain(count, attributes: attributes));
+    push(new Operation.retain(count, attributes));
   }
 
   /// Insert [text] at current position.
-  void insert(String text, {Map<String, dynamic> attributes}) {
+  void insert(String text, [Map<String, dynamic> attributes]) {
     assert(text != null);
     if (text.isEmpty) return; // no-op
-    push(new Operation.insert(text, attributes: attributes));
+    push(new Operation.insert(text, attributes));
   }
 
   /// Delete [length] columns after current position.
@@ -291,9 +299,9 @@ class Delta {
         keepNull: thisOp.isRetain,
       );
       if (thisOp.isRetain) {
-        return new Operation.retain(thisOp.length, attributes: attributes);
+        return new Operation.retain(thisOp.length, attributes);
       } else if (thisOp.isInsert) {
-        return new Operation.insert(thisOp.data, attributes: attributes);
+        return new Operation.insert(thisOp.data, attributes);
       } else {
         throw new StateError('Unreachable');
       }
@@ -350,8 +358,7 @@ class Delta {
       // Retain otherOp which is either retcol or insert.
       return new Operation.retain(
         length,
-        attributes: transformAttributes(
-            thisOp.attributes, otherOp.attributes, priority),
+        transformAttributes(thisOp.attributes, otherOp.attributes, priority),
       );
     }
   }
