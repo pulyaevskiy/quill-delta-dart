@@ -72,7 +72,7 @@ void main() {
     });
   });
 
-  group('Operation', () {
+  group('$Operation', () {
     test('insert factory', () {
       final op = new Operation.insert('a', const {'b': '1'});
       expect(op.isInsert, isTrue);
@@ -121,6 +121,11 @@ void main() {
       final op3 = new Operation.insert('b', const {'h': 'true', 'b': '1'});
       expect(op2.hashCode, isNot(op3.hashCode));
       expect(op2.hashCode, op1.hashCode);
+    });
+
+    test('toString', () {
+      final op = new Operation.insert('Hello world!\nAnd fancy line-breaks.\n');
+      expect("$op", 'insert("Hello world!⏎And fancy line-breaks.⏎")');
     });
   });
 
