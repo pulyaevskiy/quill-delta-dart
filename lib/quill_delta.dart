@@ -107,7 +107,7 @@ class Operation {
   @override
   String toString() {
     String attr = attributes == null ? '' : ', $attributes';
-    String text = data.isEmpty ? '' : data.replaceAll('\n', '⏎');
+    String text = isInsert ? data.replaceAll('\n', '⏎') : '$length';
     return isInsert ? '$key("$text"$attr)' : '$key($text$attr)';
   }
 }

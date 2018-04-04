@@ -124,8 +124,12 @@ void main() {
     });
 
     test('toString', () {
-      final op = new Operation.insert('Hello world!\nAnd fancy line-breaks.\n');
-      expect("$op", 'insert("Hello world!⏎And fancy line-breaks.⏎")');
+      var op1 = new Operation.insert('Hello world!\nAnd fancy line-breaks.\n');
+      var op2 = new Operation.retain(3);
+      var op3 = new Operation.delete(3);
+      expect("$op1", 'insert("Hello world!⏎And fancy line-breaks.⏎")');
+      expect("$op2", 'retain(3)');
+      expect("$op3", 'delete(3)');
     });
   });
 
