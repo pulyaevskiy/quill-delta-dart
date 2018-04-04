@@ -48,8 +48,8 @@ void main() {
   });
 
   group('transformAttributes', () {
-    final left = const {'bold': true, 'color': 'red', 'font': null};
-    final right = const {'color': 'blue', 'font': 'serif', 'italic': true};
+    final left = const {'bold': '1', 'color': 'red', 'font': null};
+    final right = const {'color': 'blue', 'font': 'serif', 'italic': '1'};
 
     test('left is null', () {
       expect(transformAttributes(null, left, false), left);
@@ -64,7 +64,7 @@ void main() {
     });
 
     test('with priority', () {
-      expect(transformAttributes(left, right, true), const {'italic': true});
+      expect(transformAttributes(left, right, true), const {'italic': '1'});
     });
 
     test('without priority', () {
@@ -147,9 +147,9 @@ void main() {
     });
 
     test('json', () {
-      final delta = new Delta()..insert('abc', {'bold': true});
+      final delta = new Delta()..insert('abc', {'bold': '1'});
       final result = json.encode(delta);
-      expect(result, '[{"insert":"abc","attributes":{"bold":true}}]');
+      expect(result, '[{"insert":"abc","attributes":{"bold":"1"}}]');
       final decoded = Delta.fromJson(json.decode(result));
       expect(decoded, delta);
     });

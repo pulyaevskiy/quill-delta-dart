@@ -17,11 +17,11 @@ class Operation {
   /// Length of this operation.
   final int length;
 
-  /// Payload of "insert" operation, for other types is set to `null`.
+  /// Payload of "insert" operation, for other types is set to empty string.
   final String data;
 
   /// Rich-text attributes set by this operation.
-  final Map<String, dynamic> attributes;
+  final Map<String, String> attributes;
 
   Operation._(this.key, this.length, this.data, this.attributes)
       : assert(key != null && length != null && data != null);
@@ -30,13 +30,15 @@ class Operation {
     final map = new Map<String, dynamic>.from(values);
     if (map.containsKey('insert')) {
       final String text = map['insert'];
-      return new Operation._('insert', text.length, text, map['attributes']);
+      return new Operation._('insert', text.length, text,
+          new Map<String, String>.from(map['attributes']));
     } else if (map.containsKey('delete')) {
       final int length = map['delete'];
       return new Operation._('delete', length, '', null);
     } else if (map.containsKey('retain')) {
       final int length = map['retain'];
-      return new Operation._('retain', length, '', map['attributes']);
+      return new Operation._('retain', length, '',
+          new Map<String, String>.from(map['attributes']));
     }
     throw new ArgumentError.value(
         values, 'Invalid values for Delta operation.');
@@ -51,10 +53,10 @@ class Operation {
   factory Operation.delete(int length) =>
       new Operation._('delete', length, '', null);
 
-  factory Operation.insert(String text, [Map<String, dynamic> attributes]) =>
+  factory Operation.insert(String text, [Map<String, String> attributes]) =>
       new Operation._('insert', text.length, text, attributes);
 
-  factory Operation.retain(int length, [Map<String, dynamic> attributes]) =>
+  factory Operation.retain(int length, [Map<String, String> attributes]) =>
       new Operation._('retain', length, '', attributes);
 
   /// Value of this operation. For insert operations this returns text,
@@ -86,10 +88,10 @@ class Operation {
         _compareAttributes(typedOther.attributes);
   }
 
-  bool _compareAttributes(Map<String, dynamic> otherAttributes) {
-    final comparator = new MapEquality<String, dynamic>(
+  bool _compareAttributes(Map<String, String> otherAttributes) {
+    final comparator = new MapEquality<String, String>(
       keys: const DefaultEquality<String>(),
-      values: const DefaultEquality<dynamic>(),
+      values: const DefaultEquality<String>(),
     );
     return comparator.equals(attributes, otherAttributes);
   }
@@ -113,15 +115,15 @@ class Operation {
 }
 
 /// Transform two attribute sets.
-Map<String, dynamic> transformAttributes(
-    Map<String, dynamic> a, Map<String, dynamic> b, bool priority) {
+Map<String, String> transformAttributes(
+    Map<String, String> a, Map<String, String> b, bool priority) {
   if (a == null) return b;
   if (b == null) return null;
 
   if (!priority) return b;
 
-  final Map<String, dynamic> result =
-      b.keys.fold<Map<String, dynamic>>({}, (attributes, key) {
+  final Map<String, String> result =
+      b.keys.fold<Map<String, String>>({}, (attributes, key) {
     if (!a.containsKey(key)) attributes[key] = b[key];
     return attributes;
   });
@@ -130,13 +132,13 @@ Map<String, dynamic> transformAttributes(
 }
 
 /// Composes two attribute sets.
-Map<String, dynamic> composeAttributes(
-    Map<String, dynamic> a, Map<String, dynamic> b,
+Map<String, String> composeAttributes(
+    Map<String, String> a, Map<String, String> b,
     {bool keepNull: false}) {
   a ??= const {};
   b ??= const {};
 
-  final Map<String, dynamic> result = new Map.from(a)..addAll(b);
+  final Map<String, String> result = new Map.from(a)..addAll(b);
   List<String> keys = result.keys.toList(growable: false);
 
   if (!keepNull) {
@@ -195,14 +197,14 @@ class Delta {
   int get hashCode => hashObjects(operations);
 
   /// Retain [count] of characters.
-  void retain(int count, [Map<String, dynamic> attributes]) {
+  void retain(int count, [Map<String, String> attributes]) {
     assert(count >= 0);
     if (count == 0) return; // no-op
     push(new Operation.retain(count, attributes));
   }
 
   /// Insert [text] at current position.
-  void insert(String text, [Map<String, dynamic> attributes]) {
+  void insert(String text, [Map<String, String> attributes]) {
     assert(text != null);
     if (text.isEmpty) return; // no-op
     push(new Operation.insert(text, attributes));
@@ -440,7 +442,7 @@ class DeltaIterator {
     if (_index < delta.operations.length) {
       final Operation op = delta.operations.elementAt(_index);
       final String opKey = op.key;
-      final Map<String, dynamic> opAttributes = op.attributes;
+      final Map<String, String> opAttributes = op.attributes;
       final _currentOffset = _offset;
       num maxLength =
           length == double.infinity ? (op.length - _currentOffset) : length;
