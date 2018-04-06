@@ -98,15 +98,28 @@ void main() {
       expect(op.attributes, const {'b': '1'});
     });
 
-    test('isPlainRetain', () {
-      final op2 = new Operation.retain(1);
-      final op3 = new Operation.insert('a');
-      final op4 = new Operation.delete(1);
-      final op8 = new Operation.retain(1, const {'b': '1'});
-      expect(op2.isPlainRetain, isTrue);
-      expect(op3.isPlainRetain, isFalse);
-      expect(op4.isPlainRetain, isFalse);
-      expect(op8.isPlainRetain, isFalse);
+    test('isPlain', () {
+      final op1 = new Operation.retain(1);
+      final op2 = new Operation.retain(1, {});
+      final op3 = new Operation.retain(1, {'b': '1'});
+      expect(op1.isPlain, isTrue);
+      expect(op2.isPlain, isTrue);
+      expect(op3.isPlain, isFalse);
+      expect(op1.isNotPlain, isFalse);
+      expect(op2.isNotPlain, isFalse);
+      expect(op3.isNotPlain, isTrue);
+    });
+
+    test('isEmpty', () {
+      final op1 = new Operation.retain(0);
+      final op2 = new Operation.retain(0, {});
+      final op3 = new Operation.retain(1);
+      expect(op1.isEmpty, isTrue);
+      expect(op2.isEmpty, isTrue);
+      expect(op3.isEmpty, isFalse);
+      expect(op1.isNotEmpty, isFalse);
+      expect(op2.isNotEmpty, isFalse);
+      expect(op3.isNotEmpty, isTrue);
     });
 
     test('equality', () {

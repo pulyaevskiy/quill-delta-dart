@@ -79,12 +79,19 @@ class Operation {
   /// Returns `true` if this is a retain operation.
   bool get isRetain => key == 'retain';
 
-  /// Returns `true` if this is a plain retain operations.
+  /// Returns `true` if this operation has no attributes, e.g. is plain text.
+  bool get isPlain => (attributes == null || attributes.isEmpty);
+
+  /// Returns `true` if this operation sets at least one attribute.
+  bool get isNotPlain => !isPlain;
+
+  /// Returns `true` is this operation is empty.
   ///
-  /// A retain operation is considered plain when [attributes] map is empty
-  /// or `null`.
-  bool get isPlainRetain =>
-      isRetain && (attributes == null || attributes.isEmpty);
+  /// An operation is considered empty if its [length] is equal to `0`.
+  bool get isEmpty => length == 0;
+
+  /// Returns `true` is this operation is not empty.
+  bool get isNotEmpty => length > 0;
 
   @override
   bool operator ==(other) {
@@ -96,6 +103,9 @@ class Operation {
         data == typedOther.data &&
         hasSameAttributes(typedOther);
   }
+
+  /// Returns `true` if this operation has attribute specified by [name].
+  bool hasAttribute(String name) => isNotPlain && attributes.containsKey(name);
 
   /// Returns `true` if [other] operation has the same attributes as this one.
   bool hasSameAttributes(Operation other) {
@@ -265,7 +275,7 @@ class Delta {
   /// tail is replaced with `insert('abc123')` - a compound result of the two
   /// operations.
   void push(Operation operation) {
-    if (operation.isPlainRetain && operation.length == 0) return;
+    if (operation.isEmpty) return;
 
     int index = _operations.length;
     Operation lastOp = _operations.isNotEmpty ? _operations.last : null;
@@ -410,7 +420,7 @@ class Delta {
   void trim() {
     if (isNotEmpty) {
       final Operation last = _operations.last;
-      if (last.isPlainRetain) _operations.removeLast();
+      if (last.isRetain && last.isPlain) _operations.removeLast();
     }
   }
 
