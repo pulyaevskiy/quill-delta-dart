@@ -9,21 +9,29 @@ Implementation of Quill editor Delta format in Dart. See official
 import 'package:quill_delta/quill_delta.dart';
 
 void main() {
-  var delta = new Delta();
-  delta..insert('Hello world');
+  var doc = new Delta()..insert('Hello world', {'h': '1'});
   var change = new Delta()
     ..retain(6)
     ..delete(5)
     ..insert('Earth');
-  var result = delta.compose(change);
-  print(delta);
-  print(change);
-  print(result);
+  var result = doc.compose(change);
+  print('Original document:\n$doc\n');
+  print('Change:\n$change\n');
+  print('Updated document:\n$result\n');
 
-  // Prints:
-  // Delta[insert("Hello world")]
-  // Delta[retain(6), insert("Earth"), delete(5)]
-  // Delta[insert("Hello Earth")]
+  /// Prints:
+  ///
+  ///     Original document:
+  ///     ins⟨Hello world⟩ + {h: 1}
+  ///
+  ///     Change:
+  ///     ret⟨6⟩
+  ///     ins⟨Earth⟩
+  ///     del⟨5⟩
+  ///
+  ///     Updated document:
+  ///     ins⟨Hello ⟩ + {h: 1}
+  ///     ins⟨Earth⟩
 }
 ```
 

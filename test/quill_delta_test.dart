@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 // Copyright (c) 2018, Anatoly Pulyaevskiy. All rights reserved. Use of this source code
 // is governed by a BSD-style license that can be found in the LICENSE file.
+import 'dart:convert';
 
 import 'package:quill_delta/quill_delta.dart';
 import 'package:test/test.dart';
@@ -11,39 +10,43 @@ void main() {
     final attributes = const {'b': '1', 'color': 'red'};
 
     test('left is null', () {
-      expect(composeAttributes(null, attributes), attributes);
+      expect(Delta.composeAttributes(null, attributes), attributes);
     });
 
     test('right is null', () {
-      expect(composeAttributes(attributes, null), attributes);
+      expect(Delta.composeAttributes(attributes, null), attributes);
     });
 
     test('both are null', () {
-      expect(composeAttributes(null, null), isNull);
+      expect(Delta.composeAttributes(null, null), isNull);
     });
 
     test('missing', () {
-      expect(composeAttributes(attributes, const {'i': '1'}),
+      expect(Delta.composeAttributes(attributes, const {'i': '1'}),
           {'b': '1', 'color': 'red', 'i': '1'});
     });
 
     test('overwrite', () {
-      expect(composeAttributes(attributes, const {'b': '0', 'color': 'blue'}),
+      expect(
+          Delta
+              .composeAttributes(attributes, const {'b': '0', 'color': 'blue'}),
           {'b': '0', 'color': 'blue'});
     });
 
     test('remove', () {
-      expect(
-          composeAttributes(attributes, const {'b': null}), {'color': 'red'});
+      expect(Delta.composeAttributes(attributes, const {'b': null}),
+          {'color': 'red'});
     });
 
     test('remove to null', () {
-      expect(composeAttributes(attributes, const {'b': null, 'color': null}),
+      expect(
+          Delta.composeAttributes(attributes, const {'b': null, 'color': null}),
           isNull);
     });
 
     test('remove missing', () {
-      expect(composeAttributes(attributes, const {'i': null}), attributes);
+      expect(
+          Delta.composeAttributes(attributes, const {'i': null}), attributes);
     });
   });
 
@@ -52,23 +55,24 @@ void main() {
     final right = const {'color': 'blue', 'font': 'serif', 'italic': '1'};
 
     test('left is null', () {
-      expect(transformAttributes(null, left, false), left);
+      expect(Delta.transformAttributes(null, left, false), left);
     });
 
     test('right is null', () {
-      expect(transformAttributes(left, null, false), null);
+      expect(Delta.transformAttributes(left, null, false), null);
     });
 
     test('both are null', () {
-      expect(transformAttributes(null, null, false), null);
+      expect(Delta.transformAttributes(null, null, false), null);
     });
 
     test('with priority', () {
-      expect(transformAttributes(left, right, true), const {'italic': '1'});
+      expect(
+          Delta.transformAttributes(left, right, true), const {'italic': '1'});
     });
 
     test('without priority', () {
-      expect(transformAttributes(left, right, false), right);
+      expect(Delta.transformAttributes(left, right, false), right);
     });
   });
 

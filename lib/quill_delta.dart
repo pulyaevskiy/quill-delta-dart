@@ -2,7 +2,7 @@
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
 /// Implementation of Quill Delta format in Dart.
-library delta;
+library quill_delta;
 
 import 'dart:math' as math;
 
@@ -119,48 +119,49 @@ class Operation {
   }
 }
 
-/// Transform two attribute sets.
-Map<String, String> transformAttributes(
-    Map<String, String> a, Map<String, String> b, bool priority) {
-  if (a == null) return b;
-  if (b == null) return null;
-
-  if (!priority) return b;
-
-  final Map<String, String> result =
-      b.keys.fold<Map<String, String>>({}, (attributes, key) {
-    if (!a.containsKey(key)) attributes[key] = b[key];
-    return attributes;
-  });
-
-  return result.isEmpty ? null : result;
-}
-
-/// Composes two attribute sets.
-Map<String, String> composeAttributes(
-    Map<String, String> a, Map<String, String> b,
-    {bool keepNull: false}) {
-  a ??= const {};
-  b ??= const {};
-
-  final Map<String, String> result = new Map.from(a)..addAll(b);
-  List<String> keys = result.keys.toList(growable: false);
-
-  if (!keepNull) {
-    for (final String key in keys) {
-      if (result[key] == null) result.remove(key);
-    }
-  }
-
-  return result.isEmpty ? null : result;
-}
-
-/// Delta represents a rich-text document or a change to one as a sequence of
+/// Delta represents a document or a modification of a document as a sequence of
 /// insert, delete and retain operations.
 ///
-/// Delta containing only "insert" operations is usually referred to as
-/// "document delta".
+/// Delta consisting of only "insert" operations is usually referred to as
+/// "document delta". When delta includes also "retain" or "delete" operations
+/// it is a "change delta".
 class Delta {
+  /// Transform two attribute sets.
+  static Map<String, String> transformAttributes(
+      Map<String, String> a, Map<String, String> b, bool priority) {
+    if (a == null) return b;
+    if (b == null) return null;
+
+    if (!priority) return b;
+
+    final Map<String, String> result =
+        b.keys.fold<Map<String, String>>({}, (attributes, key) {
+      if (!a.containsKey(key)) attributes[key] = b[key];
+      return attributes;
+    });
+
+    return result.isEmpty ? null : result;
+  }
+
+  /// Composes two attribute sets.
+  static Map<String, String> composeAttributes(
+      Map<String, String> a, Map<String, String> b,
+      {bool keepNull: false}) {
+    a ??= const {};
+    b ??= const {};
+
+    final Map<String, String> result = new Map.from(a)..addAll(b);
+    List<String> keys = result.keys.toList(growable: false);
+
+    if (!keepNull) {
+      for (final String key in keys) {
+        if (result[key] == null) result.remove(key);
+      }
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
   final List<Operation> _operations;
 
   int _modificationCount = 0;
@@ -332,7 +333,7 @@ class Delta {
         throw new StateError('Unreachable');
       }
     } else {
-      // otherOp == delete && thisOp in [retcol, insert]
+      // otherOp == delete && thisOp in [retain, insert]
       assert(otherOp.isDelete);
       if (thisOp.isRetain) return otherOp;
       assert(thisOp.isInsert);
@@ -374,14 +375,14 @@ class Delta {
     Operation otherOp = otherIter.next(length);
     assert(thisOp.length == otherOp.length);
 
-    // At this point only delete and retcol operations are possible.
+    // At this point only delete and retain operations are possible.
     if (thisOp.isDelete) {
-      // otherOp is either delete or retcol, so they nullify each other.
+      // otherOp is either delete or retain, so they nullify each other.
       return null;
     } else if (otherOp.isDelete) {
       return otherOp;
     } else {
-      // Retain otherOp which is either retcol or insert.
+      // Retain otherOp which is either retain or insert.
       return new Operation.retain(
         length,
         transformAttributes(thisOp.attributes, otherOp.attributes, priority),
@@ -411,6 +412,7 @@ class Delta {
     }
   }
 
+  /// Concatenates [other] with this delta and returns the result.
   Delta concat(Delta other) {
     final Delta result = new Delta.from(this);
     if (other.isNotEmpty) {
@@ -447,6 +449,9 @@ class DeltaIterator {
 
   bool get hasNext => peekLength() < double.infinity;
 
+  /// Returns length of next operation without consuming it.
+  ///
+  /// Returns [double.infinity] if there is no more operations left to iterate.
   num peekLength() {
     if (_index < delta.length) {
       final Operation operation = delta._operations[_index];
@@ -455,6 +460,10 @@ class DeltaIterator {
     return double.infinity;
   }
 
+  /// Consumes and returns next operation.
+  ///
+  /// Optional [length] specifies maximum length of operation to return. Note
+  /// that actual length of returned operation may be less than specified value.
   Operation next([num length = double.infinity]) {
     assert(length != null);
 
