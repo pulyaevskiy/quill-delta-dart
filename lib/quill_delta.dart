@@ -44,6 +44,7 @@ class Operation {
         values, 'Invalid values for Delta operation.');
   }
 
+  /// Returns JSON-serializable representation of this operation.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> json = {key: value};
     if (attributes != null) json['attributes'] = attributes;
@@ -59,23 +60,26 @@ class Operation {
   factory Operation.retain(int length, [Map<String, String> attributes]) =>
       new Operation._('retain', length, '', attributes);
 
-  /// Value of this operation. For insert operations this returns text,
-  /// for delete and retain - length.
+  /// Returns value of this operation.
+  ///
+  /// For insert operations this returns text, for delete and retain - length.
   dynamic get value => (key == 'insert') ? data : length;
 
-  /// Returns `true` if this operation is a delete operation.
+  /// Returns `true` if this is a delete operation.
   bool get isDelete => key == 'delete';
 
-  /// Returns `true` if this operation is an insert operation.
+  /// Returns `true` if this is an insert operation.
   bool get isInsert => key == 'insert';
 
-  /// Returns `true` if this operation is a retcol operation.
+  /// Returns `true` if this is a retain operation.
   bool get isRetain => key == 'retain';
 
-  /// Returns `true` if this operation does not actually mutate a document.
-  bool get isNoOp {
-    return (isRetain) && (attributes == null || attributes.isEmpty);
-  }
+  /// Returns `true` if this is a plain retain operations.
+  ///
+  /// A retain operation is considered plain when [attributes] map is empty
+  /// or `null`.
+  bool get isPlainRetain =>
+      isRetain && (attributes == null || attributes.isEmpty);
 
   @override
   bool operator ==(other) {
@@ -108,9 +112,10 @@ class Operation {
 
   @override
   String toString() {
-    String attr = attributes == null ? '' : ', $attributes';
+    String shortKey = key.substring(0, 3);
+    String attr = attributes == null ? '' : ' + $attributes';
     String text = isInsert ? data.replaceAll('\n', '⏎') : '$length';
-    return isInsert ? '$key("$text"$attr)' : '$key($text$attr)';
+    return '$shortKey⟨$text⟩$attr';
   }
 }
 
@@ -158,30 +163,50 @@ Map<String, String> composeAttributes(
 class Delta {
   final List<Operation> _operations;
 
-  List<Operation> get operations => _operations;
-
   int _modificationCount = 0;
 
   Delta._(List<Operation> operations)
       : assert(operations != null),
         _operations = operations;
 
-  /// Creates new empty delta.
+  /// Creates new empty [Delta].
   factory Delta() => new Delta._(new List<Operation>());
 
-  /// Creates new delta from [operations].
-  factory Delta.fromOperations(List<Operation> operations) =>
-      new Delta._(operations);
+  /// Creates new [Delta] from [other].
+  factory Delta.from(Delta other) =>
+      new Delta._(new List<Operation>.from(other._operations));
 
+  /// Creates [Delta] from deserialized JSON representation.
   static Delta fromJson(List data) {
     return new Delta._(data.map(Operation.fromJson).toList());
   }
 
-  List toJson() => operations;
+  /// Returns list of operations in this delta.
+  List<Operation> toList() => new List.from(_operations);
 
-  /// Returns `true` if this delta does not contain mutating operations.
-  bool get isNoOp =>
-      _operations.isEmpty || _operations.every((op) => op.isNoOp);
+  /// Returns JSON-serializable version of this delta.
+  List toJson() => toList();
+
+  /// Returns `true` if this delta is empty.
+  bool get isEmpty => _operations.isEmpty;
+
+  /// Returns `true` if this delta is not empty.
+  bool get isNotEmpty => _operations.isNotEmpty;
+
+  /// Returns number of operations in this delta.
+  int get length => _operations.length;
+
+  /// Returns [Operation] at specified [index] in this delta.
+  Operation operator [](int index) => _operations[index];
+
+  /// Returns [Operation] at specified [index] in this delta.
+  Operation elementAt(int index) => _operations.elementAt(index);
+
+  /// Returns the first [Operation] in this delta.
+  Operation get first => _operations.first;
+
+  /// Returns the last [Operation] in this delta.
+  Operation get last => _operations.last;
 
   @override
   operator ==(dynamic other) {
@@ -190,13 +215,13 @@ class Delta {
     Delta typedOther = other;
     final comparator =
         new ListEquality<Operation>(const DefaultEquality<Operation>());
-    return comparator.equals(operations, typedOther.operations);
+    return comparator.equals(_operations, typedOther._operations);
   }
 
   @override
-  int get hashCode => hashObjects(operations);
+  int get hashCode => hashObjects(_operations);
 
-  /// Retain [count] of characters.
+  /// Retain [count] of characters from current position.
   void retain(int count, [Map<String, String> attributes]) {
     assert(count >= 0);
     if (count == 0) return; // no-op
@@ -210,17 +235,16 @@ class Delta {
     push(new Operation.insert(text, attributes));
   }
 
-  /// Delete [length] columns after current position.
-  void delete(int length) {
-    assert(length >= 0);
-    if (length == 0) return;
-    push(new Operation.delete(length));
+  /// Delete [count] characters from current position.
+  void delete(int count) {
+    assert(count >= 0);
+    if (count == 0) return;
+    push(new Operation.delete(count));
   }
 
   void _mergeWithTail(Operation operation) {
-    assert(_operations.isNotEmpty);
-    assert(operation != null && _operations.last.key == operation.key);
-    final Operation last = _operations.last;
+    assert(isNotEmpty);
+    assert(operation != null && last.key == operation.key);
 
     final int length = operation.length + last.length;
     final String data = last.data + operation.data;
@@ -232,51 +256,50 @@ class Delta {
 
   /// Pushes new operation into this delta.
   ///
-  /// Performs compaction by composing [newOp] with current tail operation
-  /// of this delta, when possible. For instance,
-  ///
-  /// - if tail is `insert('abc')` and newOp is `insert('123')` then tail is
-  ///   replaced with `insert('abc123')` - a compound result of the two
-  ///   operations
-  void push(Operation newOp) {
-    if (newOp.isRetain && newOp.length == 0 && newOp.isNoOp) return;
+  /// Performs compaction by composing [operation] with current tail operation
+  /// of this delta, when possible. For instance, if current tail is
+  /// `insert('abc')` and pushed operation is `insert('123')` then existing
+  /// tail is replaced with `insert('abc123')` - a compound result of the two
+  /// operations.
+  void push(Operation operation) {
+    if (operation.isPlainRetain && operation.length == 0) return;
 
     int index = _operations.length;
     Operation lastOp = _operations.isNotEmpty ? _operations.last : null;
     if (lastOp != null) {
-      if (lastOp.isDelete && newOp.isDelete) {
-        _mergeWithTail(newOp);
+      if (lastOp.isDelete && operation.isDelete) {
+        _mergeWithTail(operation);
         return;
       }
 
-      if (lastOp.isDelete && newOp.isInsert) {
+      if (lastOp.isDelete && operation.isInsert) {
         index -= 1; // Always insert before deleting
         lastOp = (index > 0) ? _operations.elementAt(index - 1) : null;
         if (lastOp == null) {
-          _operations.insert(0, newOp);
+          _operations.insert(0, operation);
           return;
         }
       }
 
-      if (lastOp.isInsert && newOp.isInsert) {
-        if (lastOp.attributes == newOp.attributes) {
-          _mergeWithTail(newOp);
+      if (lastOp.isInsert && operation.isInsert) {
+        if (lastOp.attributes == operation.attributes) {
+          _mergeWithTail(operation);
           return;
         }
       }
 
-      if (lastOp.isRetain && newOp.isRetain) {
-        if (lastOp.attributes == newOp.attributes) {
-          _mergeWithTail(newOp);
+      if (lastOp.isRetain && operation.isRetain) {
+        if (lastOp.attributes == operation.attributes) {
+          _mergeWithTail(operation);
           return;
         }
       }
     }
     if (index == _operations.length) {
-      _operations.add(newOp);
+      _operations.add(operation);
     } else {
       final opAtIndex = _operations.elementAt(index);
-      _operations.replaceRange(index, index + 1, [newOp, opAtIndex]);
+      _operations.replaceRange(index, index + 1, [operation, opAtIndex]);
     }
     _modificationCount++;
   }
@@ -382,25 +405,25 @@ class Delta {
 
   /// Removes trailing retain operation with empty attributes, if present.
   void trim() {
-    if (_operations.isNotEmpty) {
+    if (isNotEmpty) {
       final Operation last = _operations.last;
-      if (last.isNoOp) _operations.removeLast();
+      if (last.isPlainRetain) _operations.removeLast();
     }
   }
 
   Delta concat(Delta other) {
-    final Delta delta = new Delta.fromOperations(operations);
-    if (other.operations.isNotEmpty) {
+    final Delta result = new Delta.from(this);
+    if (other.isNotEmpty) {
       // In case first operation of other can be merged with last operation in
       // our list.
-      delta.push(other.operations.first);
-      delta.operations.addAll(other.operations.sublist(1));
+      result.push(other._operations.first);
+      result._operations.addAll(other._operations.sublist(1));
     }
-    return delta;
+    return result;
   }
 
   @override
-  String toString() => '$Delta$operations';
+  String toString() => _operations.join('\n');
 }
 
 class DeltaIterator {
@@ -416,8 +439,8 @@ class DeltaIterator {
   bool get isNextRetain => nextOpKey == 'retain';
 
   String get nextOpKey {
-    if (_index < delta.operations.length) {
-      return delta.operations.elementAt(_index).key;
+    if (_index < delta.length) {
+      return delta.elementAt(_index).key;
     } else
       return null;
   }
@@ -425,8 +448,8 @@ class DeltaIterator {
   bool get hasNext => peekLength() < double.infinity;
 
   num peekLength() {
-    if (_index < delta.operations.length) {
-      final Operation operation = delta.operations[_index];
+    if (_index < delta.length) {
+      final Operation operation = delta._operations[_index];
       return operation.length - _offset;
     }
     return double.infinity;
@@ -439,8 +462,8 @@ class DeltaIterator {
       throw new ConcurrentModificationError(delta);
     }
 
-    if (_index < delta.operations.length) {
-      final Operation op = delta.operations.elementAt(_index);
+    if (_index < delta.length) {
+      final Operation op = delta.elementAt(_index);
       final String opKey = op.key;
       final Map<String, String> opAttributes = op.attributes;
       final _currentOffset = _offset;
