@@ -248,6 +248,25 @@ void main() {
           new Operation.retain(3),
         ]);
       });
+
+      test('consequent inserts with same attributes merge', () {
+        final ul = {'block': 'ul'};
+        final doc = new Delta()
+          ..insert('DartConf')
+          ..insert('\n', ul)
+          ..insert('Los Angeles')
+          ..insert('\n', ul);
+        final change = new Delta()
+          ..retain(8)
+          ..insert('\n', ul);
+        final result = doc.compose(change);
+        final expected = new Delta()
+          ..insert('DartConf')
+          ..insert('\n\n', ul)
+          ..insert('Los Angeles')
+          ..insert('\n', ul);
+        expect(result, expected);
+      });
     });
 
     group('compose', () {

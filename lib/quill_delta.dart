@@ -11,6 +11,11 @@ import 'package:quiver_hashcode/hashcode.dart';
 
 /// An operation performed on a rich-text document.
 class Operation {
+  static const _attributeEquality = const MapEquality<String, String>(
+    keys: const DefaultEquality<String>(),
+    values: const DefaultEquality<String>(),
+  );
+
   /// Key of this operation, can be "insert", "delete" or "retain".
   final String key;
 
@@ -89,15 +94,12 @@ class Operation {
     return key == typedOther.key &&
         length == typedOther.length &&
         data == typedOther.data &&
-        _compareAttributes(typedOther.attributes);
+        hasSameAttributes(typedOther);
   }
 
-  bool _compareAttributes(Map<String, String> otherAttributes) {
-    final comparator = new MapEquality<String, String>(
-      keys: const DefaultEquality<String>(),
-      values: const DefaultEquality<String>(),
-    );
-    return comparator.equals(attributes, otherAttributes);
+  /// Returns `true` if [other] operation has the same attributes as this one.
+  bool hasSameAttributes(Operation other) {
+    return _attributeEquality.equals(attributes, other.attributes);
   }
 
   @override
@@ -283,14 +285,14 @@ class Delta {
       }
 
       if (lastOp.isInsert && operation.isInsert) {
-        if (lastOp.attributes == operation.attributes) {
+        if (lastOp.hasSameAttributes(operation)) {
           _mergeWithTail(operation);
           return;
         }
       }
 
       if (lastOp.isRetain && operation.isRetain) {
-        if (lastOp.attributes == operation.attributes) {
+        if (lastOp.hasSameAttributes(operation)) {
           _mergeWithTail(operation);
           return;
         }
