@@ -25,25 +25,28 @@ class Operation {
   /// Payload of "insert" operation, for other types is set to empty string.
   final String data;
 
-  /// Rich-text attributes set by this operation.
-  final Map<String, String> attributes;
+  /// Rich-text attributes set by this operation, can be `null`.
+  Map<String, String> get attributes =>
+      _attributes == null ? null : new Map<String, String>.from(_attributes);
+  final Map<String, String> _attributes;
 
-  Operation._(this.key, this.length, this.data, this.attributes)
-      : assert(key != null && length != null && data != null);
+  Operation._(this.key, this.length, this.data, Map attributes)
+      : assert(key != null && length != null && data != null),
+        _attributes = attributes != null
+            ? new Map<String, String>.from(attributes)
+            : null;
 
   static Operation fromJson(values) {
     final map = new Map<String, dynamic>.from(values);
     if (map.containsKey('insert')) {
       final String text = map['insert'];
-      return new Operation._('insert', text.length, text,
-          new Map<String, String>.from(map['attributes']));
+      return new Operation._('insert', text.length, text, map['attributes']);
     } else if (map.containsKey('delete')) {
       final int length = map['delete'];
       return new Operation._('delete', length, '', null);
     } else if (map.containsKey('retain')) {
       final int length = map['retain'];
-      return new Operation._('retain', length, '',
-          new Map<String, String>.from(map['attributes']));
+      return new Operation._('retain', length, '', map['attributes']);
     }
     throw new ArgumentError.value(
         values, 'Invalid values for Delta operation.');
@@ -52,7 +55,7 @@ class Operation {
   /// Returns JSON-serializable representation of this operation.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> json = {key: value};
-    if (attributes != null) json['attributes'] = attributes;
+    if (_attributes != null) json['attributes'] = attributes;
     return json;
   }
 
@@ -80,7 +83,7 @@ class Operation {
   bool get isRetain => key == 'retain';
 
   /// Returns `true` if this operation has no attributes, e.g. is plain text.
-  bool get isPlain => (attributes == null || attributes.isEmpty);
+  bool get isPlain => (_attributes == null || _attributes.isEmpty);
 
   /// Returns `true` if this operation sets at least one attribute.
   bool get isNotPlain => !isPlain;
@@ -105,19 +108,19 @@ class Operation {
   }
 
   /// Returns `true` if this operation has attribute specified by [name].
-  bool hasAttribute(String name) => isNotPlain && attributes.containsKey(name);
+  bool hasAttribute(String name) => isNotPlain && _attributes.containsKey(name);
 
   /// Returns `true` if [other] operation has the same attributes as this one.
   bool hasSameAttributes(Operation other) {
-    return _attributeEquality.equals(attributes, other.attributes);
+    return _attributeEquality.equals(_attributes, other._attributes);
   }
 
   @override
   int get hashCode {
-    if (attributes != null && attributes.isNotEmpty) {
-      int keysHash = hashObjects(attributes.keys);
-      int valuesHash = hashObjects(attributes.values);
-      return hash4(key, value, keysHash, valuesHash);
+    if (_attributes != null && _attributes.isNotEmpty) {
+      int attrsHash =
+          hashObjects(_attributes.entries.map((e) => hash2(e.key, e.value)));
+      return hash3(key, value, attrsHash);
     }
     return hash2(key, value);
   }

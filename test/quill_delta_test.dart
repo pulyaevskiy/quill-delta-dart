@@ -149,6 +149,13 @@ void main() {
       expect("$op2", 'ret⟨3⟩ + {b: 1}');
       expect("$op3", 'del⟨3⟩');
     });
+
+    test('attributes immutable', () {
+      var op = new Operation.insert('\n', {'b': '1'});
+      var attrs = op.attributes;
+      attrs['b'] = null;
+      expect(op.attributes, {'b': '1'});
+    });
   });
 
   group('Delta', () {
@@ -158,9 +165,10 @@ void main() {
     });
 
     test('json', () {
-      final delta = new Delta()..insert('abc', {'b': '1'});
+      final delta = new Delta()..insert('abc', {'b': '1'})..insert('def');
       final result = json.encode(delta);
-      expect(result, '[{"insert":"abc","attributes":{"b":"1"}}]');
+      expect(
+          result, '[{"insert":"abc","attributes":{"b":"1"}},{"insert":"def"}]');
       final decoded = Delta.fromJson(json.decode(result));
       expect(decoded, delta);
     });
