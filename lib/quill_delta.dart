@@ -130,7 +130,7 @@ class Operation {
     String shortKey = key.substring(0, 3);
     String attr = attributes == null ? '' : ' + $attributes';
     String text = isInsert ? data.replaceAll('\n', '⏎') : '$length';
-    return '$shortKey⟨$text⟩$attr';
+    return '$shortKey⟨ $text ⟩$attr';
   }
 }
 
@@ -437,6 +437,31 @@ class Delta {
       result._operations.addAll(other._operations.sublist(1));
     }
     return result;
+  }
+
+  /// Transforms [index] against this delta.
+  ///
+  /// Any "delete" operation before specified [index] shifts it backward, as
+  /// well as any "insert" operation shifts it forward.
+  ///
+  /// If [priority] is set to `true` then "insert" operation at the same position
+  /// as [index] has no effect.
+  ///
+  /// Useful to adjust caret or selection positions.
+  int transformPosition(int index, {bool priority: false}) {
+    final iter = new DeltaIterator(this);
+    int offset = 0;
+    while (iter.hasNext && offset <= index) {
+      final op = iter.next();
+      if (op.isDelete) {
+        index -= math.min(op.length, index - offset);
+        continue;
+      } else if (op.isInsert && (offset < index || !priority)) {
+        index += op.length;
+      }
+      offset += op.length;
+    }
+    return index;
   }
 
   @override

@@ -145,9 +145,9 @@ void main() {
           'Hello world!\nAnd fancy line-breaks.\n', {'b': '1'});
       var op2 = new Operation.retain(3, {'b': '1'});
       var op3 = new Operation.delete(3);
-      expect("$op1", 'ins⟨Hello world!⏎And fancy line-breaks.⏎⟩ + {b: 1}');
-      expect("$op2", 'ret⟨3⟩ + {b: 1}');
-      expect("$op3", 'del⟨3⟩');
+      expect("$op1", 'ins⟨ Hello world!⏎And fancy line-breaks.⏎ ⟩ + {b: 1}');
+      expect("$op2", 'ret⟨ 3 ⟩ + {b: 1}');
+      expect("$op3", 'del⟨ 3 ⟩');
     });
 
     test('attributes immutable', () {
@@ -177,7 +177,7 @@ void main() {
       final delta = new Delta()
         ..insert('Hello world!⏎', {'b': '1'})
         ..retain(5);
-      expect("$delta", 'ins⟨Hello world!⏎⟩ + {b: 1}\nret⟨5⟩');
+      expect("$delta", 'ins⟨ Hello world!⏎ ⟩ + {b: 1}\nret⟨ 5 ⟩');
     });
 
     group('push', () {
@@ -580,6 +580,73 @@ void main() {
         var expected2 = new Delta();
         expect(a1.transform(b1, false), expected1);
         expect(b2.transform(a2, false), expected2);
+      });
+    });
+
+    group('transformPosition', () {
+      test('insert before position', () {
+        var delta = new Delta()..insert('A');
+        expect(delta.transformPosition(2), 3);
+      });
+
+      test('insert after position', () {
+        var delta = new Delta()
+          ..retain(2)
+          ..insert('A');
+        expect(delta.transformPosition(1), 1);
+      });
+
+      test('insert at position', () {
+        // xyz
+        // ret 2, ins A => xyAz
+        var delta = new Delta()
+          ..retain(2)
+          ..insert('A');
+        expect(delta.transformPosition(2, priority: true), 2);
+        expect(delta.transformPosition(2, priority: false), 3);
+      });
+
+      test('delete before position', () {
+        var delta = new Delta()..delete(2);
+        expect(delta.transformPosition(4), 2);
+      });
+
+      test('delete after position', () {
+        var delta = new Delta()
+          ..retain(4)
+          ..delete(2);
+        expect(delta.transformPosition(2), 2);
+      });
+
+      test('delete across position', () {
+        var delta = new Delta()
+          ..retain(1)
+          ..delete(4);
+        expect(delta.transformPosition(2), 1);
+      });
+
+      test('insert and delete before position', () {
+        var delta = new Delta()
+          ..retain(2)
+          ..insert('A')
+          ..delete(2);
+        expect(delta.transformPosition(4), 3);
+      });
+
+      test('insert before and delete across position', () {
+        var delta = new Delta()
+          ..retain(2)
+          ..insert('A')
+          ..delete(4);
+        expect(delta.transformPosition(4), 3);
+      });
+
+      test('delete before and delete across position', () {
+        var delta = new Delta()
+          ..delete(1)
+          ..retain(1)
+          ..delete(4);
+        expect(delta.transformPosition(4), 1);
       });
     });
   });
