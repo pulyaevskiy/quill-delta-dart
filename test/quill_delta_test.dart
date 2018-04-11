@@ -145,9 +145,9 @@ void main() {
           'Hello world!\nAnd fancy line-breaks.\n', {'b': '1'});
       var op2 = new Operation.retain(3, {'b': '1'});
       var op3 = new Operation.delete(3);
-      expect("$op1", 'ins⟨ Hello world!⏎And fancy line-breaks.⏎ ⟩ + {b: 1}');
-      expect("$op2", 'ret⟨ 3 ⟩ + {b: 1}');
-      expect("$op3", 'del⟨ 3 ⟩');
+      expect("$op1", 'insert⟨ Hello world!⏎And fancy line-breaks.⏎ ⟩ + {b: 1}');
+      expect("$op2", 'retain⟨ 3 ⟩ + {b: 1}');
+      expect("$op3", 'delete⟨ 3 ⟩');
     });
 
     test('attributes immutable', () {
@@ -177,7 +177,7 @@ void main() {
       final delta = new Delta()
         ..insert('Hello world!⏎', {'b': '1'})
         ..retain(5);
-      expect("$delta", 'ins⟨ Hello world!⏎ ⟩ + {b: 1}\nret⟨ 5 ⟩');
+      expect("$delta", 'insert⟨ Hello world!⏎ ⟩ + {b: 1}\nretain⟨ 5 ⟩');
     });
 
     group('push', () {
@@ -648,6 +648,71 @@ void main() {
           ..delete(4);
         expect(delta.transformPosition(4), 1);
       });
+    });
+  });
+
+  group('$DeltaIterator', () {
+    Delta delta = new Delta()
+      ..insert('Hello', {'b': '1'})
+      ..retain(3)
+      ..insert(' world', {'i': '1'})
+      ..delete(4);
+    DeltaIterator iterator;
+
+    setUp(() {
+      iterator = new DeltaIterator(delta);
+    });
+
+    test('hasNext', () {
+      expect(iterator.hasNext, isTrue);
+      iterator..next()..next()..next()..next();
+      expect(iterator.hasNext, isFalse);
+    });
+
+    test('peekLength', () {
+      expect(iterator.peekLength(), 5);
+      iterator.next();
+      expect(iterator.peekLength(), 3);
+      iterator.next();
+      expect(iterator.peekLength(), 6);
+      iterator.next();
+      expect(iterator.peekLength(), 4);
+      iterator.next();
+    });
+
+    test('peekLength with operation split', () {
+      iterator.next(2);
+      expect(iterator.peekLength(), 5 - 2);
+    });
+
+    test('peekLength after EOF', () {
+      iterator.skip(18);
+      expect(iterator.peekLength(), double.infinity);
+    });
+
+    test('peek operation type', () {
+      expect(iterator.isNextInsert, isTrue);
+      iterator.next();
+      expect(iterator.isNextRetain, isTrue);
+      iterator.next();
+      expect(iterator.isNextInsert, isTrue);
+      iterator.next();
+      expect(iterator.isNextDelete, isTrue);
+      iterator.next();
+    });
+
+    test('next', () {
+      expect(iterator.next(), new Operation.insert('Hello', {'b': '1'}));
+      expect(iterator.next(), new Operation.retain(3));
+      expect(iterator.next(), new Operation.insert(' world', {'i': '1'}));
+      expect(iterator.next(), new Operation.delete(4));
+    });
+
+    test('next with operation split', () {
+      expect(iterator.next(2), new Operation.insert('He', {'b': '1'}));
+      expect(iterator.next(10), new Operation.insert('llo', {'b': '1'}));
+      expect(iterator.next(1), new Operation.retain(1));
+      expect(iterator.next(2), new Operation.retain(2));
     });
   });
 }

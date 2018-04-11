@@ -9,7 +9,7 @@ import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:quiver_hashcode/hashcode.dart';
 
-/// An operation performed on a rich-text document.
+/// Operation performed on a rich-text document.
 class Operation {
   static const _attributeEquality = const MapEquality<String, String>(
     keys: const DefaultEquality<String>(),
@@ -32,6 +32,10 @@ class Operation {
 
   Operation._(this.key, this.length, this.data, Map attributes)
       : assert(key != null && length != null && data != null),
+        assert(() {
+          if (key != 'insert') return true;
+          return data.length == length;
+        }(), 'Length of insert operation must be equal to the text length.'),
         _attributes = attributes != null
             ? new Map<String, String>.from(attributes)
             : null;
@@ -127,10 +131,9 @@ class Operation {
 
   @override
   String toString() {
-    String shortKey = key.substring(0, 3);
     String attr = attributes == null ? '' : ' + $attributes';
     String text = isInsert ? data.replaceAll('\n', '⏎') : '$length';
-    return '$shortKey⟨ $text ⟩$attr';
+    return '$key⟨ $text ⟩$attr';
   }
 }
 
@@ -141,7 +144,7 @@ class Operation {
 /// "document delta". When delta includes also "retain" or "delete" operations
 /// it is a "change delta".
 class Delta {
-  /// Transform two attribute sets.
+  /// Transforms two attribute sets.
   static Map<String, String> transformAttributes(
       Map<String, String> a, Map<String, String> b, bool priority) {
     if (a == null) return b;
@@ -192,7 +195,7 @@ class Delta {
   factory Delta.from(Delta other) =>
       new Delta._(new List<Operation>.from(other._operations));
 
-  /// Creates [Delta] from deserialized JSON representation.
+  /// Creates [Delta] from de-serialized JSON representation.
   static Delta fromJson(List data) {
     return new Delta._(data.map(Operation.fromJson).toList());
   }
@@ -324,7 +327,7 @@ class Delta {
   ///
   /// Returns new operation or `null` if operations from [thisIter] and
   /// [otherIter] nullify each other. For instance, for the pair `insert('abc')`
-  /// and `delete(3)` composition result would be no-op.
+  /// and `delete(3)` composition result would be empty string.
   Operation _composeOperation(DeltaIterator thisIter, DeltaIterator otherIter) {
     if (otherIter.isNextInsert) return otherIter.next();
     if (thisIter.isNextDelete) return thisIter.next();
@@ -468,6 +471,7 @@ class Delta {
   String toString() => _operations.join('\n');
 }
 
+/// Specialized iterator for [Delta]s.
 class DeltaIterator {
   final Delta delta;
   int _index = 0;
@@ -476,11 +480,11 @@ class DeltaIterator {
 
   DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
-  bool get isNextInsert => nextOpKey == 'insert';
-  bool get isNextDelete => nextOpKey == 'delete';
-  bool get isNextRetain => nextOpKey == 'retain';
+  bool get isNextInsert => nextOperationKey == 'insert';
+  bool get isNextDelete => nextOperationKey == 'delete';
+  bool get isNextRetain => nextOperationKey == 'retain';
 
-  String get nextOpKey {
+  String get nextOperationKey {
     if (_index < delta.length) {
       return delta.elementAt(_index).key;
     } else
@@ -512,24 +516,38 @@ class DeltaIterator {
     }
 
     if (_index < delta.length) {
-      final Operation op = delta.elementAt(_index);
-      final String opKey = op.key;
-      final Map<String, String> opAttributes = op.attributes;
+      final op = delta.elementAt(_index);
+      final opKey = op.key;
+      final opAttributes = op.attributes;
       final _currentOffset = _offset;
-      num maxLength =
-          length == double.infinity ? (op.length - _currentOffset) : length;
-      if (maxLength == op.length - _currentOffset) {
+      num actualLength = math.min(op.length - _currentOffset, length);
+      if (actualLength == op.length - _currentOffset) {
         _index++;
         _offset = 0;
       } else {
-        _offset += maxLength;
+        _offset += actualLength;
       }
       final String opData = op.isInsert
-          ? op.data.substring(_currentOffset, _currentOffset + maxLength)
+          ? op.data.substring(_currentOffset, _currentOffset + actualLength)
           : '';
-      final int opLength = (opData.isNotEmpty) ? opData.length : maxLength;
+      final int opLength = (opData.isNotEmpty) ? opData.length : actualLength;
       return new Operation._(opKey, opLength, opData, opAttributes);
     }
     return new Operation.retain(length);
+  }
+
+  /// Skips [length] characters in source delta.
+  ///
+  /// Returns last skipped operation, or `null` if there was nothing to skip.
+  Operation skip(int length) {
+    int skipped = 0;
+    Operation op;
+    while (skipped < length && hasNext) {
+      int opLength = peekLength();
+      int skip = math.min(length - skipped, opLength);
+      op = next(skip);
+      skipped += op.length;
+    }
+    return op;
   }
 }
