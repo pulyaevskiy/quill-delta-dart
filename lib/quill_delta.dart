@@ -9,13 +9,13 @@ import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:quiver_hashcode/hashcode.dart';
 
+const _attributeEquality = const MapEquality<String, dynamic>(
+  keys: const DefaultEquality<String>(),
+  values: const DefaultEquality(),
+);
+
 /// Operation performed on a rich-text document.
 class Operation {
-  static const _attributeEquality = const MapEquality<String, String>(
-    keys: const DefaultEquality<String>(),
-    values: const DefaultEquality<String>(),
-  );
-
   /// Key of this operation, can be "insert", "delete" or "retain".
   final String key;
 
@@ -26,9 +26,9 @@ class Operation {
   final String data;
 
   /// Rich-text attributes set by this operation, can be `null`.
-  Map<String, String> get attributes =>
-      _attributes == null ? null : new Map<String, String>.from(_attributes);
-  final Map<String, String> _attributes;
+  Map<String, dynamic> get attributes =>
+      _attributes == null ? null : new Map<String, dynamic>.from(_attributes);
+  final Map<String, dynamic> _attributes;
 
   Operation._(this.key, this.length, this.data, Map attributes)
       : assert(key != null && length != null && data != null),
@@ -37,7 +37,7 @@ class Operation {
           return data.length == length;
         }(), 'Length of insert operation must be equal to the text length.'),
         _attributes = attributes != null
-            ? new Map<String, String>.from(attributes)
+            ? new Map<String, dynamic>.from(attributes)
             : null;
 
   static Operation fromJson(values) {
@@ -66,10 +66,10 @@ class Operation {
   factory Operation.delete(int length) =>
       new Operation._('delete', length, '', null);
 
-  factory Operation.insert(String text, [Map<String, String> attributes]) =>
+  factory Operation.insert(String text, [Map<String, dynamic> attributes]) =>
       new Operation._('insert', text.length, text, attributes);
 
-  factory Operation.retain(int length, [Map<String, String> attributes]) =>
+  factory Operation.retain(int length, [Map<String, dynamic> attributes]) =>
       new Operation._('retain', length, '', attributes);
 
   /// Returns value of this operation.
@@ -145,15 +145,15 @@ class Operation {
 /// it is a "change delta".
 class Delta {
   /// Transforms two attribute sets.
-  static Map<String, String> transformAttributes(
-      Map<String, String> a, Map<String, String> b, bool priority) {
+  static Map<String, dynamic> transformAttributes(
+      Map<String, dynamic> a, Map<String, dynamic> b, bool priority) {
     if (a == null) return b;
     if (b == null) return null;
 
     if (!priority) return b;
 
-    final Map<String, String> result =
-        b.keys.fold<Map<String, String>>({}, (attributes, key) {
+    final Map<String, dynamic> result =
+        b.keys.fold<Map<String, dynamic>>({}, (attributes, key) {
       if (!a.containsKey(key)) attributes[key] = b[key];
       return attributes;
     });
@@ -162,13 +162,13 @@ class Delta {
   }
 
   /// Composes two attribute sets.
-  static Map<String, String> composeAttributes(
-      Map<String, String> a, Map<String, String> b,
+  static Map<String, dynamic> composeAttributes(
+      Map<String, dynamic> a, Map<String, dynamic> b,
       {bool keepNull: false}) {
     a ??= const {};
     b ??= const {};
 
-    final Map<String, String> result = new Map.from(a)..addAll(b);
+    final Map<String, dynamic> result = new Map.from(a)..addAll(b);
     List<String> keys = result.keys.toList(growable: false);
 
     if (!keepNull) {
@@ -241,14 +241,14 @@ class Delta {
   int get hashCode => hashObjects(_operations);
 
   /// Retain [count] of characters from current position.
-  void retain(int count, [Map<String, String> attributes]) {
+  void retain(int count, [Map<String, dynamic> attributes]) {
     assert(count >= 0);
     if (count == 0) return; // no-op
     push(new Operation.retain(count, attributes));
   }
 
   /// Insert [text] at current position.
-  void insert(String text, [Map<String, String> attributes]) {
+  void insert(String text, [Map<String, dynamic> attributes]) {
     assert(text != null);
     if (text.isEmpty) return; // no-op
     push(new Operation.insert(text, attributes));
