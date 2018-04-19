@@ -601,8 +601,8 @@ void main() {
         var delta = new Delta()
           ..retain(2)
           ..insert('A');
-        expect(delta.transformPosition(2, priority: true), 2);
-        expect(delta.transformPosition(2, priority: false), 3);
+        expect(delta.transformPosition(2, force: false), 2);
+        expect(delta.transformPosition(2, force: true), 3);
       });
 
       test('delete before position', () {

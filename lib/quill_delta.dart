@@ -447,11 +447,14 @@ class Delta {
   /// Any "delete" operation before specified [index] shifts it backward, as
   /// well as any "insert" operation shifts it forward.
   ///
-  /// If [priority] is set to `true` then "insert" operation at the same position
-  /// as [index] has no effect.
+  /// The [force] argument is used to resolve scenarios when there is an
+  /// insert operation at the same position as [index]. If [force] is set to
+  /// `true` (default) then position is forced to shift forward, otherwise
+  /// position stays at the same index. In other words setting [force] to
+  /// `false` gives higher priority to the transformed position.
   ///
   /// Useful to adjust caret or selection positions.
-  int transformPosition(int index, {bool priority: false}) {
+  int transformPosition(int index, {bool force: true}) {
     final iter = new DeltaIterator(this);
     int offset = 0;
     while (iter.hasNext && offset <= index) {
@@ -459,7 +462,7 @@ class Delta {
       if (op.isDelete) {
         index -= math.min(op.length, index - offset);
         continue;
-      } else if (op.isInsert && (offset < index || !priority)) {
+      } else if (op.isInsert && (offset < index || force)) {
         index += op.length;
       }
       offset += op.length;
