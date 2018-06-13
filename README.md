@@ -39,4 +39,4 @@ void main() {
 
 Please file feature requests and bugs at the [issue tracker][tracker].
 
-[tracker]: https://github.com/pulyaevskiy/dart-quill-delta/issues
+[tracker]: https://github.com/pulyaevskiy/quill-delta-dart/issues
