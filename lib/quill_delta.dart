@@ -40,8 +40,9 @@ class Operation {
             ? new Map<String, dynamic>.from(attributes)
             : null;
 
-  static Operation fromJson(values) {
-    final map = new Map<String, dynamic>.from(values);
+  /// Creates new [Operation] from JSON payload.
+  static Operation fromJson(data) {
+    final map = new Map<String, dynamic>.from(data);
     if (map.containsKey('insert')) {
       final String text = map['insert'];
       return new Operation._('insert', text.length, text, map['attributes']);
@@ -52,8 +53,7 @@ class Operation {
       final int length = map['retain'];
       return new Operation._('retain', length, '', map['attributes']);
     }
-    throw new ArgumentError.value(
-        values, 'Invalid values for Delta operation.');
+    throw new ArgumentError.value(data, 'Invalid data for Delta operation.');
   }
 
   /// Returns JSON-serializable representation of this operation.
@@ -63,12 +63,16 @@ class Operation {
     return json;
   }
 
+  /// Creates operation which deletes [length] of characters.
   factory Operation.delete(int length) =>
       new Operation._('delete', length, '', null);
 
+  /// Creates operation which inserts [text] with optional [attributes].
   factory Operation.insert(String text, [Map<String, dynamic> attributes]) =>
       new Operation._('insert', text.length, text, attributes);
 
+  /// Creates operation which retains [length] of characters and optionally
+  /// applies attributes.
   factory Operation.retain(int length, [Map<String, dynamic> attributes]) =>
       new Operation._('retain', length, '', attributes);
 
