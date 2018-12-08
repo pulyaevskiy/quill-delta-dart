@@ -14,10 +14,12 @@ const _attributeEquality = const MapEquality<String, dynamic>(
   values: const DefaultEquality(),
 );
 
+enum OperationType { insert, retain, delete}
+
 /// Operation performed on a rich-text document.
 class Operation {
   /// Key of this operation, can be "insert", "delete" or "retain".
-  final String key;
+  final OperationType operationType;
 
   /// Length of this operation.
   final int length;
@@ -30,65 +32,69 @@ class Operation {
       _attributes == null ? null : new Map<String, dynamic>.from(_attributes);
   final Map<String, dynamic> _attributes;
 
-  Operation._(this.key, this.length, this.data, Map attributes)
-      : assert(key != null && length != null && data != null),
+  Operation._(this.operationType, this.length, this.data, Map attributes)
+      : assert(operationType != null && length != null && data != null),
         assert(() {
-          if (key != 'insert') return true;
+          if (operationType != OperationType.insert) return true;
           return data.length == length;
         }(), 'Length of insert operation must be equal to the text length.'),
         _attributes = attributes != null
             ? new Map<String, dynamic>.from(attributes)
             : null;
 
+  static String getOperationTypeString(OperationType opType) {
+    return opType.toString().split('.').last;
+  }
+
   /// Creates new [Operation] from JSON payload.
   static Operation fromJson(data) {
     final map = new Map<String, dynamic>.from(data);
     if (map.containsKey('insert')) {
       final String text = map['insert'];
-      return new Operation._('insert', text.length, text, map['attributes']);
+      return new Operation._(OperationType.insert, text.length, text, map['attributes']);
     } else if (map.containsKey('delete')) {
       final int length = map['delete'];
-      return new Operation._('delete', length, '', null);
+      return new Operation._(OperationType.delete, length, '', null);
     } else if (map.containsKey('retain')) {
       final int length = map['retain'];
-      return new Operation._('retain', length, '', map['attributes']);
+      return new Operation._(OperationType.retain, length, '', map['attributes']);
     }
     throw new ArgumentError.value(data, 'Invalid data for Delta operation.');
   }
 
   /// Returns JSON-serializable representation of this operation.
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> json = {key: value};
+    final Map<String, dynamic> json = {getOperationTypeString(operationType): value};
     if (_attributes != null) json['attributes'] = attributes;
     return json;
   }
 
   /// Creates operation which deletes [length] of characters.
   factory Operation.delete(int length) =>
-      new Operation._('delete', length, '', null);
+      new Operation._(OperationType.delete, length, '', null);
 
   /// Creates operation which inserts [text] with optional [attributes].
   factory Operation.insert(String text, [Map<String, dynamic> attributes]) =>
-      new Operation._('insert', text.length, text, attributes);
+      new Operation._(OperationType.insert, text.length, text, attributes);
 
   /// Creates operation which retains [length] of characters and optionally
   /// applies attributes.
   factory Operation.retain(int length, [Map<String, dynamic> attributes]) =>
-      new Operation._('retain', length, '', attributes);
+      new Operation._(OperationType.retain, length, '', attributes);
 
   /// Returns value of this operation.
   ///
   /// For insert operations this returns text, for delete and retain - length.
-  dynamic get value => (key == 'insert') ? data : length;
+  dynamic get value => (operationType == OperationType.insert) ? data : length;
 
   /// Returns `true` if this is a delete operation.
-  bool get isDelete => key == 'delete';
+  bool get isDelete => operationType == OperationType.delete;
 
   /// Returns `true` if this is an insert operation.
-  bool get isInsert => key == 'insert';
+  bool get isInsert => operationType == OperationType.insert;
 
   /// Returns `true` if this is a retain operation.
-  bool get isRetain => key == 'retain';
+  bool get isRetain => operationType == OperationType.retain;
 
   /// Returns `true` if this operation has no attributes, e.g. is plain text.
   bool get isPlain => (_attributes == null || _attributes.isEmpty);
@@ -109,7 +115,7 @@ class Operation {
     if (identical(this, other)) return true;
     if (other is! Operation) return false;
     Operation typedOther = other;
-    return key == typedOther.key &&
+    return operationType == typedOther.operationType &&
         length == typedOther.length &&
         data == typedOther.data &&
         hasSameAttributes(typedOther);
@@ -128,15 +134,16 @@ class Operation {
     if (_attributes != null && _attributes.isNotEmpty) {
       int attrsHash =
           hashObjects(_attributes.entries.map((e) => hash2(e.key, e.value)));
-      return hash3(key, value, attrsHash);
+      return hash3(operationType, value, attrsHash);
     }
-    return hash2(key, value);
+    return hash2(operationType, value);
   }
 
   @override
   String toString() {
     String attr = attributes == null ? '' : ' + $attributes';
     String text = isInsert ? data.replaceAll('\n', '⏎') : '$length';
+    String key = getOperationTypeString(operationType);
     return '$key⟨ $text ⟩$attr';
   }
 }
@@ -267,13 +274,13 @@ class Delta {
 
   void _mergeWithTail(Operation operation) {
     assert(isNotEmpty);
-    assert(operation != null && last.key == operation.key);
+    assert(operation != null && last.operationType == operation.operationType);
 
     final int length = operation.length + last.length;
     final String data = last.data + operation.data;
     final int index = _operations.length;
     _operations.replaceRange(index - 1, index, [
-      new Operation._(operation.key, length, data, operation.attributes),
+      new Operation._(operation.operationType, length, data, operation.attributes),
     ]);
   }
 
@@ -487,13 +494,13 @@ class DeltaIterator {
 
   DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
-  bool get isNextInsert => nextOperationKey == 'insert';
-  bool get isNextDelete => nextOperationKey == 'delete';
-  bool get isNextRetain => nextOperationKey == 'retain';
+  bool get isNextInsert => nextOperationType == OperationType.insert;
+  bool get isNextDelete => nextOperationType == OperationType.delete;
+  bool get isNextRetain => nextOperationType == OperationType.retain;
 
-  String get nextOperationKey {
+  OperationType get nextOperationType {
     if (_index < delta.length) {
-      return delta.elementAt(_index).key;
+      return delta.elementAt(_index).operationType;
     } else
       return null;
   }
@@ -524,7 +531,7 @@ class DeltaIterator {
 
     if (_index < delta.length) {
       final op = delta.elementAt(_index);
-      final opKey = op.key;
+      final opType = op.operationType;
       final opAttributes = op.attributes;
       final _currentOffset = _offset;
       num actualLength = math.min(op.length - _currentOffset, length);
@@ -538,7 +545,7 @@ class DeltaIterator {
           ? op.data.substring(_currentOffset, _currentOffset + actualLength)
           : '';
       final int opLength = (opData.isNotEmpty) ? opData.length : actualLength;
-      return new Operation._(opKey, opLength, opData, opAttributes);
+      return new Operation._(opType, opLength, opData, opAttributes);
     }
     return new Operation.retain(length);
   }
