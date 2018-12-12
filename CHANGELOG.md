@@ -1,3 +1,7 @@
+## 1.0.0-dev.4.0
+
+* Internal clean-up replacing hardcoded strings with constants.
+
 ## 1.0.0-dev.3.0
 
 * Updated dependency on quiver_hashcode.

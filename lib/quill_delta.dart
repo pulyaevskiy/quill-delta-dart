@@ -9,13 +9,27 @@ import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:quiver_hashcode/hashcode.dart';
 
-const _attributeEquality = const MapEquality<String, dynamic>(
-  keys: const DefaultEquality<String>(),
-  values: const DefaultEquality(),
+const _attributeEquality = MapEquality<String, dynamic>(
+  keys: DefaultEquality<String>(),
+  values: DefaultEquality(),
 );
 
 /// Operation performed on a rich-text document.
 class Operation {
+  /// Key of insert operations.
+  static const String insertKey = 'insert';
+
+  /// Key of delete operations.
+  static const String deleteKey = 'delete';
+
+  /// Key of retain operations.
+  static const String retainKey = 'retain';
+
+  /// Key of attributes collection.
+  static const String attributesKey = 'attributes';
+
+  static const List<String> _validKeys = [insertKey, deleteKey, retainKey];
+
   /// Key of this operation, can be "insert", "delete" or "retain".
   final String key;
 
@@ -32,8 +46,9 @@ class Operation {
 
   Operation._(this.key, this.length, this.data, Map attributes)
       : assert(key != null && length != null && data != null),
+        assert(_validKeys.contains(key), 'Invalid operation key "$key".'),
         assert(() {
-          if (key != 'insert') return true;
+          if (key != Operation.insertKey) return true;
           return data.length == length;
         }(), 'Length of insert operation must be equal to the text length.'),
         _attributes = attributes != null
@@ -43,15 +58,17 @@ class Operation {
   /// Creates new [Operation] from JSON payload.
   static Operation fromJson(data) {
     final map = new Map<String, dynamic>.from(data);
-    if (map.containsKey('insert')) {
-      final String text = map['insert'];
-      return new Operation._('insert', text.length, text, map['attributes']);
-    } else if (map.containsKey('delete')) {
-      final int length = map['delete'];
-      return new Operation._('delete', length, '', null);
-    } else if (map.containsKey('retain')) {
-      final int length = map['retain'];
-      return new Operation._('retain', length, '', map['attributes']);
+    if (map.containsKey(Operation.insertKey)) {
+      final String text = map[Operation.insertKey];
+      return new Operation._(
+          Operation.insertKey, text.length, text, map[Operation.attributesKey]);
+    } else if (map.containsKey(Operation.deleteKey)) {
+      final int length = map[Operation.deleteKey];
+      return new Operation._(Operation.deleteKey, length, '', null);
+    } else if (map.containsKey(Operation.retainKey)) {
+      final int length = map[Operation.retainKey];
+      return new Operation._(
+          Operation.retainKey, length, '', map[Operation.attributesKey]);
     }
     throw new ArgumentError.value(data, 'Invalid data for Delta operation.');
   }
@@ -59,36 +76,36 @@ class Operation {
   /// Returns JSON-serializable representation of this operation.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> json = {key: value};
-    if (_attributes != null) json['attributes'] = attributes;
+    if (_attributes != null) json[Operation.attributesKey] = attributes;
     return json;
   }
 
   /// Creates operation which deletes [length] of characters.
   factory Operation.delete(int length) =>
-      new Operation._('delete', length, '', null);
+      new Operation._(Operation.deleteKey, length, '', null);
 
   /// Creates operation which inserts [text] with optional [attributes].
   factory Operation.insert(String text, [Map<String, dynamic> attributes]) =>
-      new Operation._('insert', text.length, text, attributes);
+      new Operation._(Operation.insertKey, text.length, text, attributes);
 
   /// Creates operation which retains [length] of characters and optionally
   /// applies attributes.
   factory Operation.retain(int length, [Map<String, dynamic> attributes]) =>
-      new Operation._('retain', length, '', attributes);
+      new Operation._(Operation.retainKey, length, '', attributes);
 
   /// Returns value of this operation.
   ///
   /// For insert operations this returns text, for delete and retain - length.
-  dynamic get value => (key == 'insert') ? data : length;
+  dynamic get value => (key == Operation.insertKey) ? data : length;
 
   /// Returns `true` if this is a delete operation.
-  bool get isDelete => key == 'delete';
+  bool get isDelete => key == Operation.deleteKey;
 
   /// Returns `true` if this is an insert operation.
-  bool get isInsert => key == 'insert';
+  bool get isInsert => key == Operation.insertKey;
 
   /// Returns `true` if this is a retain operation.
-  bool get isRetain => key == 'retain';
+  bool get isRetain => key == Operation.retainKey;
 
   /// Returns `true` if this operation has no attributes, e.g. is plain text.
   bool get isPlain => (_attributes == null || _attributes.isEmpty);
@@ -248,21 +265,21 @@ class Delta {
   void retain(int count, [Map<String, dynamic> attributes]) {
     assert(count >= 0);
     if (count == 0) return; // no-op
-    push(new Operation.retain(count, attributes));
+    push(Operation.retain(count, attributes));
   }
 
   /// Insert [text] at current position.
   void insert(String text, [Map<String, dynamic> attributes]) {
     assert(text != null);
     if (text.isEmpty) return; // no-op
-    push(new Operation.insert(text, attributes));
+    push(Operation.insert(text, attributes));
   }
 
   /// Delete [count] characters from current position.
   void delete(int count) {
     assert(count >= 0);
     if (count == 0) return;
-    push(new Operation.delete(count));
+    push(Operation.delete(count));
   }
 
   void _mergeWithTail(Operation operation) {
@@ -273,7 +290,7 @@ class Delta {
     final String data = last.data + operation.data;
     final int index = _operations.length;
     _operations.replaceRange(index - 1, index, [
-      new Operation._(operation.key, length, data, operation.attributes),
+      Operation._(operation.key, length, data, operation.attributes),
     ]);
   }
 
@@ -487,9 +504,9 @@ class DeltaIterator {
 
   DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
-  bool get isNextInsert => nextOperationKey == 'insert';
-  bool get isNextDelete => nextOperationKey == 'delete';
-  bool get isNextRetain => nextOperationKey == 'retain';
+  bool get isNextInsert => nextOperationKey == Operation.insertKey;
+  bool get isNextDelete => nextOperationKey == Operation.deleteKey;
+  bool get isNextRetain => nextOperationKey == Operation.retainKey;
 
   String get nextOperationKey {
     if (_index < delta.length) {
@@ -538,9 +555,9 @@ class DeltaIterator {
           ? op.data.substring(_currentOffset, _currentOffset + actualLength)
           : '';
       final int opLength = (opData.isNotEmpty) ? opData.length : actualLength;
-      return new Operation._(opKey, opLength, opData, opAttributes);
+      return Operation._(opKey, opLength, opData, opAttributes);
     }
-    return new Operation.retain(length);
+    return Operation.retain(length);
   }
 
   /// Skips [length] characters in source delta.
