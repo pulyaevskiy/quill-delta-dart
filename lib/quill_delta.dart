@@ -202,13 +202,13 @@ class Delta {
   }
 
   ///get anti-attr result base on base
-  Map<String, dynamic> invertAttributes(
+  static Map<String, dynamic> invertAttributes(
       Map<String, dynamic> attr, Map<String, dynamic> base) {
-    attr ??= {};
-    base ??= {};
+    attr ??= const {};
+    base ??= const {};
 
     var baseInverted = base.keys.fold({}, (memo, key) {
-      if (base[key] != attr[key] && attr[key] == null) {
+      if (base[key] != attr[key] && attr.containsKey(key)) {
         memo[key] = base[key];
       }
       return memo;
@@ -216,7 +216,7 @@ class Delta {
 
     var inverted =
         Map<String, dynamic>.from(attr.keys.fold(baseInverted, (memo, key) {
-      if (base[key] != attr[key] && base[key] == null) {
+      if (base[key] != attr[key] && !base.containsKey(key)) {
         memo[key] = null;
       }
       return memo;
@@ -486,11 +486,13 @@ class Delta {
     return result;
   }
 
-  /// invert this delta base on base
+  /// invert this delta base on baseDelta
   Delta invert(Delta base) {
     Delta inverted = new Delta();
+
     if (base.isEmpty) return inverted;
     int baseIndex = 0;
+
     for (Operation op in _operations) {
       if (op.isInsert) {
         inverted.delete(op.length);
