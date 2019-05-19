@@ -8,11 +8,11 @@ import 'package:test/test.dart';
 void main() {
   group('invertAttributes', () {
     test("attributes is null", () {
-      expect(Delta.invertAttributes(null, {'b':true}), {});
+      expect(Delta.invertAttributes(null, {'b': true}), {});
     });
 
     test("base is null", () {
-      expect(Delta.invertAttributes({'b':true}, null), {'b':null});
+      expect(Delta.invertAttributes({'b': true}, null), {'b': null});
     });
 
     test("both is null", () {
@@ -20,22 +20,23 @@ void main() {
     });
 
     test("missing", () {
-      expect(Delta.invertAttributes({'b':null}, {'b':true}), {'b':true});
+      expect(Delta.invertAttributes({'b': null}, {'b': true}), {'b': true});
     });
 
     test("overrite", () {
-      expect(Delta.invertAttributes({'s':'10px'}, {'s':'12px'}), {'s':'12px'});
+      expect(
+          Delta.invertAttributes({'s': '10px'}, {'s': '12px'}), {'s': '12px'});
     });
 
     test("remove", () {
-      expect(Delta.invertAttributes({'b':true}, {'b':true}), {});
+      expect(Delta.invertAttributes({'b': true}, {'b': true}), {});
     });
 
     test("combined", () {
-      var attributes = { 'b': true, 'i': null, 'c': 'red', 's': '12px' };
-      var base = { 'f': 'serif', 'i': true, 'c': 'blue', 's': '12px' };
-      var expected = { 'b': null, 'i': true, 'c': 'blue' };
-      expect(Delta.invertAttributes(attributes, base),expected);
+      var attributes = {'b': true, 'i': null, 'c': 'red', 's': '12px'};
+      var base = {'f': 'serif', 'i': true, 'c': 'blue', 's': '12px'};
+      var expected = {'b': null, 'i': true, 'c': 'blue'};
+      expect(Delta.invertAttributes(attributes, base), expected);
     });
   });
 
@@ -216,39 +217,47 @@ void main() {
 
     group("invert", () {
       test('insert', () {
-        final delta = new Delta()..retain(2)..insert('A');
+        final delta = new Delta()
+          ..retain(2)
+          ..insert('A');
         final base = new Delta()..insert('123456');
-        final expected = new Delta()..retain(2)..delete(1);
+        final expected = new Delta()
+          ..retain(2)
+          ..delete(1);
         final inverted = delta.invert(base);
-        expect(expected,inverted);
-        expect(base.compose(delta).compose(inverted),base);
+        expect(expected, inverted);
+        expect(base.compose(delta).compose(inverted), base);
       });
 
       test('delete', () {
-        final delta = new Delta()..retain(2)..delete(3);
+        final delta = new Delta()
+          ..retain(2)
+          ..delete(3);
         final base = new Delta()..insert('123456');
-        final expected = new Delta()..retain(2)..insert('345');
+        final expected = new Delta()
+          ..retain(2)
+          ..insert('345');
         final inverted = delta.invert(base);
-        expect(expected,inverted);
-        expect(base.compose(delta).compose(inverted),base);
+        expect(expected, inverted);
+        expect(base.compose(delta).compose(inverted), base);
       });
 
       test('retain', () {
-        final delta = new Delta()..retain(2)..retain(3, { 'b': true });
+        final delta = new Delta()..retain(2)..retain(3, {'b': true});
         final base = new Delta()..insert('123456');
-        final expected = new Delta()..retain(2)..retain(3, { 'b': null });
+        final expected = new Delta()..retain(2)..retain(3, {'b': null});
         final inverted = delta.invert(base);
-        expect(expected,inverted);
-        expect(base.compose(delta).compose(inverted),base);
+        expect(expected, inverted);
+        expect(base.compose(delta).compose(inverted), base);
       });
 
       test('retain on a delta with different attributes', () {
-        final base = new Delta()..insert('123')..insert('4', { 'b': true });
-        final delta = new Delta()..retain(4, { 'i': true });
-        final expected = new Delta()..retain(4, { 'i': null });
+        final base = new Delta()..insert('123')..insert('4', {'b': true});
+        final delta = new Delta()..retain(4, {'i': true});
+        final expected = new Delta()..retain(4, {'i': null});
         final inverted = delta.invert(base);
-        expect(expected,inverted);
-        expect(base.compose(delta).compose(inverted),base);
+        expect(expected, inverted);
+        expect(base.compose(delta).compose(inverted), base);
       });
     });
 
