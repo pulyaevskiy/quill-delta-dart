@@ -201,6 +201,29 @@ class Delta {
     return result.isEmpty ? null : result;
   }
 
+  ///get anti-attr result base on base
+  static Map<String, dynamic> invertAttributes(
+      Map<String, dynamic> attr, Map<String, dynamic> base) {
+    attr ??= const {};
+    base ??= const {};
+
+    var baseInverted = base.keys.fold({}, (memo, key) {
+      if (base[key] != attr[key] && attr.containsKey(key)) {
+        memo[key] = base[key];
+      }
+      return memo;
+    });
+
+    var inverted =
+        Map<String, dynamic>.from(attr.keys.fold(baseInverted, (memo, key) {
+      if (base[key] != attr[key] && !base.containsKey(key)) {
+        memo[key] = null;
+      }
+      return memo;
+    }));
+    return inverted;
+  }
+
   final List<Operation> _operations;
 
   int _modificationCount = 0;
@@ -463,6 +486,59 @@ class Delta {
     return result;
   }
 
+  /// invert this delta base on baseDelta
+  Delta invert(Delta base) {
+    Delta inverted = new Delta();
+
+    if (base.isEmpty) return inverted;
+    int baseIndex = 0;
+
+    for (Operation op in _operations) {
+      if (op.isInsert) {
+        inverted.delete(op.length);
+      } else if (op.isRetain && op.attributes == null) {
+        inverted.retain(op.length, null);
+        baseIndex += op.length;
+      } else if (op.isDelete || (op.isRetain && op.attributes != null)) {
+        var length = op.length;
+        Delta sliceDelta = base.slice(baseIndex, baseIndex + length);
+        sliceDelta.toList().forEach((baseOp) {
+          if (op.isDelete) {
+            inverted.push(baseOp);
+          } else if (op.isRetain && op.attributes != null) {
+            var invertAttr = invertAttributes(op.attributes, baseOp.attributes);
+            assert(invertAttr.isNotEmpty);
+            inverted.retain(baseOp.length, invertAttr);
+          }
+        });
+        baseIndex += length;
+      }
+    }
+    inverted.trim();
+    return inverted;
+  }
+
+  /// get specific delta from start to end
+  Delta slice(int start, int end) {
+    var ops = [];
+    int index = 0;
+    var opIterator = new DeltaIterator(this);
+
+    while (index < end && opIterator.hasNext) {
+      Operation op;
+      if (index < start) {
+        op = opIterator.next(start - index);
+      } else {
+        op = opIterator.next(end - index);
+        ops.add(op);
+      }
+      index += op.length;
+    }
+    Delta newDelta = new Delta();
+    ops.forEach((op) => newDelta._operations.add(op));
+    return newDelta;
+  }
+
   /// Transforms [index] against this delta.
   ///
   /// Any "delete" operation before specified [index] shifts it backward, as
@@ -505,7 +581,9 @@ class DeltaIterator {
   DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
   bool get isNextInsert => nextOperationKey == Operation.insertKey;
+
   bool get isNextDelete => nextOperationKey == Operation.deleteKey;
+
   bool get isNextRetain => nextOperationKey == Operation.retainKey;
 
   String get nextOperationKey {
