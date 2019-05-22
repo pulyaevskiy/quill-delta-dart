@@ -486,57 +486,62 @@ class Delta {
     return result;
   }
 
-  /// invert this delta base on baseDelta
+  /// Inverts this delta against [base].
+  ///
+  /// Returns new delta which negates effect of this delta when applied to
+  /// [base]. This is an equivalent of "undo" operation on deltas.
   Delta invert(Delta base) {
-    Delta inverted = new Delta();
-
+    final inverted = new Delta();
     if (base.isEmpty) return inverted;
-    int baseIndex = 0;
 
-    for (Operation op in _operations) {
+    int baseIndex = 0;
+    for (final op in _operations) {
       if (op.isInsert) {
         inverted.delete(op.length);
-      } else if (op.isRetain && op.attributes == null) {
+      } else if (op.isRetain && op.isPlain) {
         inverted.retain(op.length, null);
         baseIndex += op.length;
-      } else if (op.isDelete || (op.isRetain && op.attributes != null)) {
-        var length = op.length;
-        Delta sliceDelta = base.slice(baseIndex, baseIndex + length);
+      } else if (op.isDelete || (op.isRetain && op.isNotPlain)) {
+        final length = op.length;
+        final sliceDelta = base.slice(baseIndex, baseIndex + length);
         sliceDelta.toList().forEach((baseOp) {
           if (op.isDelete) {
             inverted.push(baseOp);
-          } else if (op.isRetain && op.attributes != null) {
+          } else if (op.isRetain && op.isNotPlain) {
             var invertAttr = invertAttributes(op.attributes, baseOp.attributes);
-            assert(invertAttr.isNotEmpty);
-            inverted.retain(baseOp.length, invertAttr);
+            inverted.retain(
+                baseOp.length, invertAttr.isEmpty ? null : invertAttr);
           }
         });
         baseIndex += length;
+      } else {
+        throw StateError("Unreachable");
       }
     }
     inverted.trim();
     return inverted;
   }
 
-  /// get specific delta from start to end
-  Delta slice(int start, int end) {
-    var ops = [];
-    int index = 0;
+  /// Returns slice of this delta from [start] index (inclusive) to [end]
+  /// (exclusive).
+  Delta slice(int start, [int end]) {
+    final delta = new Delta();
+    var index = 0;
     var opIterator = new DeltaIterator(this);
 
-    while (index < end && opIterator.hasNext) {
+    num actualEnd = end ?? double.infinity;
+
+    while (index < actualEnd && opIterator.hasNext) {
       Operation op;
       if (index < start) {
         op = opIterator.next(start - index);
       } else {
-        op = opIterator.next(end - index);
-        ops.add(op);
+        op = opIterator.next(actualEnd - index);
+        delta.push(op);
       }
       index += op.length;
     }
-    Delta newDelta = new Delta();
-    ops.forEach((op) => newDelta._operations.add(op));
-    return newDelta;
+    return delta;
   }
 
   /// Transforms [index] against this delta.

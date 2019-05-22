@@ -7,35 +7,63 @@ import 'package:test/test.dart';
 
 void main() {
   group('invertAttributes', () {
-    test("attributes is null", () {
-      expect(Delta.invertAttributes(null, {'b': true}), {});
+    test('attr is null', () {
+      var base = {'bold': true};
+      expect(Delta.invertAttributes(null, base), {});
     });
 
-    test("base is null", () {
-      expect(Delta.invertAttributes({'b': true}, null), {'b': null});
+    test('base is null', () {
+      var attributes = {'bold': true};
+      var expected = {'bold': null};
+      expect(Delta.invertAttributes(attributes, null), expected);
     });
 
-    test("both is null", () {
+    test('both null', () {
       expect(Delta.invertAttributes(null, null), {});
     });
 
-    test("missing", () {
-      expect(Delta.invertAttributes({'b': null}, {'b': true}), {'b': true});
+    test('merge', () {
+      var attributes = {'bold': true};
+      var base = {'italic': true};
+      var expected = {'bold': null};
+      expect(Delta.invertAttributes(attributes, base), expected);
     });
 
-    test("overrite", () {
-      expect(
-          Delta.invertAttributes({'s': '10px'}, {'s': '12px'}), {'s': '12px'});
+    test('null', () {
+      var attributes = {'bold': null};
+      var base = {'bold': true};
+      var expected = {'bold': true};
+      expect(Delta.invertAttributes(attributes, base), expected);
     });
 
-    test("remove", () {
-      expect(Delta.invertAttributes({'b': true}, {'b': true}), {});
+    test('replace', () {
+      var attributes = {'color': 'red'};
+      var base = {'color': 'blue'};
+      var expected = base;
+      expect(Delta.invertAttributes(attributes, base), expected);
     });
 
-    test("combined", () {
-      var attributes = {'b': true, 'i': null, 'c': 'red', 's': '12px'};
-      var base = {'f': 'serif', 'i': true, 'c': 'blue', 's': '12px'};
-      var expected = {'b': null, 'i': true, 'c': 'blue'};
+    test('noop', () {
+      var attributes = {'color': 'red'};
+      var base = {'color': 'red'};
+      var expected = {};
+      expect(Delta.invertAttributes(attributes, base), expected);
+    });
+
+    test('combined', () {
+      var attributes = {
+        'bold': true,
+        'italic': null,
+        'color': 'red',
+        'size': '12px'
+      };
+      var base = {
+        'font': 'serif',
+        'italic': true,
+        'color': 'blue',
+        'size': '12px'
+      };
+      var expected = {'bold': null, 'italic': true, 'color': 'blue'};
       expect(Delta.invertAttributes(attributes, base), expected);
     });
   });
@@ -257,6 +285,32 @@ void main() {
         final expected = new Delta()..retain(4, {'i': null});
         final inverted = delta.invert(base);
         expect(expected, inverted);
+        expect(base.compose(delta).compose(inverted), base);
+      });
+
+      test('combined', () {
+        var delta = new Delta()
+          ..retain(2)
+          ..delete(2)
+          ..insert('AB', {'italic': true})
+          ..retain(2, {'italic': null, 'bold': true})
+          ..retain(2, {'color': 'red'})
+          ..delete(1);
+        var base = new Delta()
+          ..insert('123', {'bold': true})
+          ..insert('456', {'italic': true})
+          ..insert('789', {'color': 'red', 'bold': true});
+        var expected = new Delta()
+          ..retain(2)
+          ..insert('3', {'bold': true})
+          ..insert('4', {'italic': true})
+          ..delete(2)
+          ..retain(2, {'italic': true, 'bold': null})
+          ..retain(2)
+          ..insert('9', {'color': 'red', 'bold': true});
+
+        var inverted = delta.invert(base);
+        expect(inverted, expected);
         expect(base.compose(delta).compose(inverted), base);
       });
     });
@@ -726,6 +780,63 @@ void main() {
           ..retain(1)
           ..delete(4);
         expect(delta.transformPosition(4), 1);
+      });
+    });
+
+    group('slice', () {
+      test('start', () {
+        var slice = (Delta()
+              ..retain(2)
+              ..insert('A'))
+            .slice(2);
+        var expected = new Delta()..insert('A');
+        expect(slice, expected);
+      });
+
+      test('start and end chop', () {
+        var slice = (Delta()..insert('0123456789')).slice(2, 7);
+        var expected = new Delta()..insert('23456');
+        expect(slice, expected);
+      });
+
+      test('start and end multiple chop', () {
+        var slice = (Delta()..insert('0123', {'bold': true})..insert('4567'))
+            .slice(3, 5);
+        var expected = Delta()..insert('3', {'bold': true})..insert('4');
+        expect(slice, expected);
+      });
+
+      test('start and end', () {
+        var slice = (Delta()
+              ..retain(2)
+              ..insert('A', {'bold': true})
+              ..insert('B'))
+            .slice(2, 3);
+        var expected = Delta()..insert('A', {'bold': true});
+        expect(slice, expected);
+      });
+
+      test('from beginning', () {
+        var delta = Delta()
+          ..retain(2)
+          ..insert('A', {'bold': true})
+          ..insert('B');
+        var slice = delta.slice(0);
+        expect(slice, delta);
+      });
+
+      test('split ops', () {
+        var slice =
+            (Delta()..insert('AB', {'bold': true})..insert('C')).slice(1, 2);
+        var expected = new Delta()..insert('B', {'bold': true});
+        expect(slice, expected);
+      });
+
+      test('split ops multiple times', () {
+        var slice =
+            (Delta()..insert('ABC', {'bold': true})..insert('D')).slice(1, 2);
+        var expected = Delta()..insert('B', {'bold': true});
+        expect(slice, expected);
       });
     });
   });

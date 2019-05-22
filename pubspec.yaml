@@ -1,6 +1,6 @@
 name: quill_delta
 description: Implementation of Quill Delta format in Dart
-version: 1.0.0-dev.4.0
+version: 1.0.0
 homepage: https://github.com/pulyaevskiy/quill-delta-dart
 author: Anatoly Pulyaevskiy <anatoly.pulyaevskiy@gmail.com>
 

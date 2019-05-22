@@ -1,3 +1,7 @@
+## 1.0.0
+
+* Added `Delta.invert()`, `Delta.slice()` and `Delta.invertAttributes()`.
+
 ## 1.0.0-dev.4.0
 
 * Internal clean-up replacing hardcoded strings with constants.
