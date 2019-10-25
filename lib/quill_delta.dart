@@ -337,8 +337,8 @@ class Delta {
 
       if (lastOp.isDelete && operation.isInsert) {
         index -= 1; // Always insert before deleting
-        lastOp = (index > 0) ? _operations.elementAt(index - 1) : null;
-        if (lastOp == null) {
+        var nLastOp = (index > 0) ? _operations.elementAt(index - 1) : null;
+        if (nLastOp == null) {
           _operations.insert(0, operation);
           return;
         }
