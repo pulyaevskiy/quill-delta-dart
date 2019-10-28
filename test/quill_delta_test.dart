@@ -423,8 +423,18 @@ void main() {
           ..insert('\n', ul);
         expect(result, expected);
       });
-    });
 
+      test('consequent deletes and inserts', () {
+        final doc = new Delta()..insert('YOLOYOLO');
+        final change = new Delta()
+          ..insert('YATA')
+          ..delete(4)
+          ..insert('YATA');
+        final result = doc.compose(change);
+        final expected = new Delta()..insert('YATAYATAYOLO');
+        expect(result, expected);
+      });
+    });
     group('compose', () {
       // ==== insert combinations ====
 
