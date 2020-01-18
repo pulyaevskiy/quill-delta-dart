@@ -4,8 +4,8 @@
 import 'package:quill_delta/quill_delta.dart';
 
 void main() {
-  var doc = new Delta()..insert('Hello world', {'h': '1'});
-  var change = new Delta()
+  var doc = Delta()..insert('Hello world', {'h': '1'});
+  var change = Delta()
     ..retain(6)
     ..delete(5)
     ..insert('Earth');

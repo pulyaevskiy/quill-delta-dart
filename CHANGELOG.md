@@ -1,3 +1,7 @@
+## 1.0.1
+
+* Fixed assertion error for sequences of insert-delete-insert operations.
+
 ## 1.0.0
 
 * Added `Delta.invert()`, `Delta.slice()` and `Delta.invertAttributes()`.
