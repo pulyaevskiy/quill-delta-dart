@@ -1,10 +1,14 @@
 language: dart
 
 dart:
-- dev
+  - stable
+  - dev
 
-dart_task:
-- test
-- dartfmt
-- dartanalyzer: --fatal-warnings lib
-
+script:
+  - pub get
+  - pub run test -r expanded
+  - dartfmt -n --set-exit-if-changed lib/
+  - dartfmt -n --set-exit-if-changed test/
+  - dartanalyzer --fatal-infos --fatal-warnings .
+  - pub run test_coverage
+  - bash <(curl -s https://codecov.io/bash)
