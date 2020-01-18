@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/pulyaevskiy/quill-delta-dart.svg?branch=master)](https://travis-ci.org/pulyaevskiy/quill-delta-dart) [![Pub](https://img.shields.io/pub/v/quill_delta.svg)](https://pub.dev/packages/quill_delta)
+[![Build Status](https://travis-ci.org/pulyaevskiy/quill-delta-dart.svg?branch=master)](https://travis-ci.org/pulyaevskiy/quill-delta-dart) [![codecov](https://codecov.io/gh/pulyaevskiy/quill-delta-dart/branch/master/graph/badge.svg)](https://codecov.io/gh/pulyaevskiy/quill-delta-dart) [![Pub](https://img.shields.io/pub/v/quill_delta.svg)](https://pub.dev/packages/quill_delta)
 
 Implementation of Quill editor Delta format in Dart. Refer to official
 [documentation][] for more details.
