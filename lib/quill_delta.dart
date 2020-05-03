@@ -9,10 +9,7 @@ import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:quiver_hashcode/hashcode.dart';
 
-const _attributeEquality = MapEquality<String, dynamic>(
-  keys: DefaultEquality<String>(),
-  values: DefaultEquality(),
-);
+const _attributeEquality = DeepCollectionEquality();
 
 /// Operation performed on a rich-text document.
 class Operation {
