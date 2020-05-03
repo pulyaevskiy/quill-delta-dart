@@ -1,3 +1,7 @@
+## 1.0.2
+
+* Fix attributes comparison for operations when attributes have complex values (maps, lists).
+
 ## 1.0.1
 
 * Fixed assertion error for sequences of insert-delete-insert operations.

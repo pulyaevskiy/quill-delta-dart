@@ -223,7 +223,7 @@ void main() {
     test('attributes operator== simple', () {
       var op1 = Operation.insert('\n', {'b': true});
       var op2 = Operation.insert('\n', {'b': true});
-      expect(op1 == op2, true);
+      expect(op1 == op2, isTrue);
     });
 
     test('attributes operator== complex', () {
@@ -233,7 +233,7 @@ void main() {
       var op2 = Operation.insert('\n', {
         'b': {'c': 'd'}
       });
-      expect(op1 == op2, true);
+      expect(op1 == op2, isTrue);
     });
   });
 
