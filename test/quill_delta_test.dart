@@ -146,6 +146,13 @@ void main() {
       expect(op.attributes, const {'b': true});
     });
 
+    test('insert (object) factory', () {
+      final op = Operation.insert({}, const {'b': true});
+      expect(op.isInsert, isTrue);
+      expect(op.length, 1);
+      expect(op.attributes, const {'b': true});
+    });
+
     test('delete factory', () {
       final op = Operation.delete(5);
       expect(op.isDelete, isTrue);
@@ -207,10 +214,12 @@ void main() {
           'Hello world!\nAnd fancy line-breaks.\n', {'b': true});
       var op2 = Operation.retain(3, {'b': '1'});
       var op3 = Operation.delete(3);
+      var op4 = Operation.insert({'a': 1}, {'b': true});
       expect(
           '$op1', 'insert⟨ Hello world!⏎And fancy line-breaks.⏎ ⟩ + {b: true}');
       expect('$op2', 'retain⟨ 3 ⟩ + {b: 1}');
       expect('$op3', 'delete⟨ 3 ⟩');
+      expect('$op4', 'insert⟨ {a: 1} ⟩ + {b: true}');
     });
 
     test('attributes immutable', () {
@@ -244,10 +253,13 @@ void main() {
     });
 
     test('json', () {
-      final delta = Delta()..insert('abc', {'b': true})..insert('def');
+      final delta = Delta()
+        ..insert('abc', {'b': true})
+        ..insert('def')
+        ..insert({'a': 1});
       final result = json.encode(delta);
       expect(result,
-          '[{"insert":"abc","attributes":{"b":true}},{"insert":"def"}]');
+          '[{"insert":"abc","attributes":{"b":true}},{"insert":"def"},{"insert":{"a":1}}]');
       final decoded = Delta.fromJson(json.decode(result));
       expect(decoded, delta);
     });
@@ -339,11 +351,33 @@ void main() {
         expect(delta.first, Operation.insert('abc123'));
       });
 
+      test('insert + insert (object)', () {
+        const data = {};
+        final delta = Delta()..insert('abc')..insert(data);
+        expect(delta[0], Operation.insert('abc'));
+        expect(delta[1], Operation.insert(data));
+      });
+
+      test('insert (object) + insert', () {
+        const data = {};
+        final delta = Delta()..insert(data)..insert('abc');
+        expect(delta[0], Operation.insert(data));
+        expect(delta[1], Operation.insert('abc'));
+      });
+
       test('insert + delete', () {
         final delta = Delta()
           ..insert('abc')
           ..delete(3);
         expect(delta[0], Operation.insert('abc'));
+        expect(delta[1], Operation.delete(3));
+      });
+
+      test('insert (object) + delete', () {
+        final delta = Delta()
+          ..insert(const {})
+          ..delete(3);
+        expect(delta[0], Operation.insert(const {}));
         expect(delta[1], Operation.delete(3));
       });
 
@@ -355,6 +389,14 @@ void main() {
         expect(delta[1], Operation.retain(3));
       });
 
+      test('insert (object) + retain', () {
+        final delta = Delta()
+          ..insert(const {})
+          ..retain(3);
+        expect(delta[0], Operation.insert(const {}));
+        expect(delta[1], Operation.retain(3));
+      });
+
       // ==== delete combinations ====
 
       test('delete + insert', () {
@@ -362,6 +404,14 @@ void main() {
           ..delete(2)
           ..insert('abc');
         expect(delta[0], Operation.insert('abc'));
+        expect(delta[1], Operation.delete(2));
+      });
+
+      test('delete + insert (object)', () {
+        final delta = Delta()
+          ..delete(2)
+          ..insert(const {});
+        expect(delta[0], Operation.insert(const {}));
         expect(delta[1], Operation.delete(2));
       });
 
@@ -388,6 +438,14 @@ void main() {
         expect(delta[1], Operation.insert('abc'));
       });
 
+      test('retain + insert (object)', () {
+        final delta = Delta()
+          ..retain(2)
+          ..insert(const {});
+        expect(delta[0], Operation.retain(2));
+        expect(delta[1], Operation.insert(const {}));
+      });
+
       test('retain + delete', () {
         final delta = Delta()
           ..retain(2)
@@ -408,6 +466,35 @@ void main() {
         expect(delta.toList(), [
           Operation.insert('abc', const {'b': true}),
           Operation.insert('123'),
+        ]);
+      });
+
+      test('consequent inserts (object) do not merge', () {
+        final delta = Delta()..insert(const {})..insert(const {});
+        expect(delta.toList(), [
+          Operation.insert(const {}),
+          Operation.insert(const {}),
+        ]);
+      });
+
+      test('consequent inserts (object) with different attributes do not merge',
+          () {
+        final delta = Delta()
+          ..insert(const {}, const {'b': true})
+          ..insert(const {});
+        expect(delta.toList(), [
+          Operation.insert(const {}, const {'b': true}),
+          Operation.insert(const {}),
+        ]);
+      });
+
+      test('consequent inserts (object) with same attributes do not merge', () {
+        final delta = Delta()
+          ..insert(const {}, const {'b': true})
+          ..insert(const {}, const {'b': true});
+        expect(delta.toList(), [
+          Operation.insert(const {}, const {'b': true}),
+          Operation.insert(const {}, const {'b': true}),
         ]);
       });
 
@@ -448,6 +535,20 @@ void main() {
         final expected = Delta()..insert('YATAYATAYOLO');
         expect(result, expected);
       });
+
+      test('consequent deletes and inserts (object)', () {
+        final doc = Delta()
+          ..insert(const {})
+          ..insert(const {})
+          ..insert(const {});
+        final change = Delta()
+          ..insert('YATA')
+          ..delete(2)
+          ..insert('YATA');
+        final result = doc.compose(change);
+        final expected = Delta()..insert('YATAYATA')..insert(const {});
+        expect(result, expected);
+      });
     });
     group('compose', () {
       // ==== insert combinations ====
@@ -459,8 +560,28 @@ void main() {
         expect(a.compose(b), expected);
       });
 
+      test('insert + insert (object)', () {
+        final a = Delta()..insert('A');
+        final b = Delta()..insert(const {});
+        final expected = Delta()..insert(const {})..insert('A');
+        expect(a.compose(b), expected);
+      });
+
+      test('insert (object) + insert', () {
+        final a = Delta()..insert(const {});
+        final b = Delta()..insert('B');
+        final expected = Delta()..insert('B')..insert(const {});
+        expect(a.compose(b), expected);
+      });
+
       test('insert + delete', () {
         final a = Delta()..insert('A');
+        final b = Delta()..delete(1);
+        expect(a.compose(b), isEmpty);
+      });
+
+      test('insert (object) + delete', () {
+        final a = Delta()..insert(const {});
         final b = Delta()..delete(1);
         expect(a.compose(b), isEmpty);
       });
@@ -473,6 +594,14 @@ void main() {
         ]);
       });
 
+      test('insert (object) + retain', () {
+        final a = Delta()..insert(const {});
+        final b = Delta()..retain(1, const {'b': true});
+        expect(a.compose(b).toList(), [
+          Operation.insert(const {}, const {'b': true})
+        ]);
+      });
+
       // ==== delete combinations ====
 
       test('delete + insert', () {
@@ -480,6 +609,15 @@ void main() {
         final b = Delta()..insert('B');
         final expected = Delta()
           ..insert('B')
+          ..delete(1);
+        expect(a.compose(b), expected);
+      });
+
+      test('delete + insert (object)', () {
+        final a = Delta()..delete(1);
+        final b = Delta()..insert(const {});
+        final expected = Delta()
+          ..insert(const {})
           ..delete(1);
         expect(a.compose(b), expected);
       });
@@ -511,6 +649,15 @@ void main() {
         expect(a.compose(b), expected);
       });
 
+      test('retain + insert (object)', () {
+        final a = Delta()..retain(1, const {'b': true});
+        final b = Delta()..insert(const {});
+        final expected = Delta()
+          ..insert(const {})
+          ..retain(1, const {'b': true});
+        expect(a.compose(b), expected);
+      });
+
       test('retain + delete', () {
         final a = Delta()..retain(1, const {'b': true});
         final b = Delta()..delete(1);
@@ -536,6 +683,15 @@ void main() {
         expect(a.compose(b), expected);
       });
 
+      test('insert (object) in middle of text', () {
+        final a = Delta()..insert('Hello');
+        final b = Delta()
+          ..retain(3)
+          ..insert(const {});
+        final expected = Delta()..insert('Hel')..insert(const {})..insert('lo');
+        expect(a.compose(b), expected);
+      });
+
       test('insert and delete ordering', () {
         final a = Delta()..insert('Hello');
         final b = Delta()..insert('Hello');
@@ -552,11 +708,45 @@ void main() {
         expect(b.compose(deleteFirst), expected);
       });
 
+      test('insert (object) and delete ordering', () {
+        final a = Delta()
+          ..insert(const [1])
+          ..insert(const [2])
+          ..insert(const [3]);
+        final b = Delta()
+          ..insert(const [1])
+          ..insert(const [2])
+          ..insert(const [3]);
+        final insertFirst = Delta()
+          ..retain(2)
+          ..insert('X')
+          ..delete(1);
+        final deleteFirst = Delta()
+          ..retain(2)
+          ..delete(1)
+          ..insert('X');
+        final expected = Delta()
+          ..insert(const [1])
+          ..insert(const [2])
+          ..insert('X');
+        expect(a.compose(insertFirst), expected);
+        expect(b.compose(deleteFirst), expected);
+      });
+
       test('delete entire text', () {
         final a = Delta()
           ..retain(4)
           ..insert('Hello');
         final b = Delta()..delete(9);
+        final expected = Delta()..delete(4);
+        expect(a.compose(b), expected);
+      });
+
+      test('delete object', () {
+        final a = Delta()
+          ..retain(4)
+          ..insert(const {});
+        final b = Delta()..delete(5);
         final expected = Delta()..delete(4);
         expect(a.compose(b), expected);
       });
@@ -568,10 +758,24 @@ void main() {
         expect(a.compose(b), expected);
       });
 
+      test('retain more than length of op with object', () {
+        final a = Delta()..insert(const {});
+        final b = Delta()..retain(10);
+        final expected = Delta()..insert(const {});
+        expect(a.compose(b), expected);
+      });
+
       test('remove all attributes', () {
         final a = Delta()..insert('A', const {'b': true});
         final b = Delta()..retain(1, const {'b': null});
         final expected = Delta()..insert('A');
+        expect(a.compose(b), expected);
+      });
+
+      test('remove all attributes in object', () {
+        final a = Delta()..insert(const {}, const {'b': true});
+        final b = Delta()..retain(1, const {'b': null});
+        final expected = Delta()..insert(const {});
         expect(a.compose(b), expected);
       });
     });
@@ -590,8 +794,30 @@ void main() {
         expect(a2.transform(b2, false), expected2);
       });
 
+      test('insert + insert (object)', () {
+        var a1 = Delta()..insert('A');
+        var b1 = Delta()..insert(const {});
+        var a2 = Delta.from(a1);
+        var b2 = Delta.from(b1);
+        var expected1 = Delta()
+          ..retain(1)
+          ..insert(const {});
+        var expected2 = Delta()..insert(const {});
+        expect(a1.transform(b1, true), expected1);
+        expect(a2.transform(b2, false), expected2);
+      });
+
       test('insert + retain', () {
         var a = Delta()..insert('A');
+        var b = Delta()..retain(1, const {'bold': true, 'color': 'red'});
+        var expected = Delta()
+          ..retain(1)
+          ..retain(1, const {'bold': true, 'color': 'red'});
+        expect(a.transform(b, true), expected);
+      });
+
+      test('insert (object) + retain', () {
+        var a = Delta()..insert(const {});
         var b = Delta()..retain(1, const {'bold': true, 'color': 'red'});
         var expected = Delta()
           ..retain(1)
@@ -608,10 +834,26 @@ void main() {
         expect(a.transform(b, true), expected);
       });
 
+      test('insert (object) + delete', () {
+        var a = Delta()..insert(const {});
+        var b = Delta()..delete(1);
+        var expected = Delta()
+          ..retain(1)
+          ..delete(1);
+        expect(a.transform(b, true), expected);
+      });
+
       test('delete + insert', () {
         var a = Delta()..delete(1);
         var b = Delta()..insert('B');
         var expected = Delta()..insert('B');
+        expect(a.transform(b, true), expected);
+      });
+
+      test('delete + insert (object)', () {
+        var a = Delta()..delete(1);
+        var b = Delta()..insert(const {});
+        var expected = Delta()..insert(const {});
         expect(a.transform(b, true), expected);
       });
 
@@ -633,6 +875,13 @@ void main() {
         var a = Delta()..retain(1, const {'color': 'blue'});
         var b = Delta()..insert('B');
         var expected = Delta()..insert('B');
+        expect(a.transform(b, true), expected);
+      });
+
+      test('retain + insert (object)', () {
+        var a = Delta()..retain(1, const {'color': 'blue'});
+        var b = Delta()..insert(const {});
+        var expected = Delta()..insert(const {});
         expect(a.transform(b, true), expected);
       });
 
@@ -747,6 +996,11 @@ void main() {
         expect(delta.transformPosition(2), 3);
       });
 
+      test('insert (object) before position', () {
+        var delta = Delta()..insert(const {});
+        expect(delta.transformPosition(2), 3);
+      });
+
       test('insert after position', () {
         var delta = Delta()
           ..retain(2)
@@ -754,10 +1008,25 @@ void main() {
         expect(delta.transformPosition(1), 1);
       });
 
+      test('insert (object) after position', () {
+        var delta = Delta()
+          ..retain(2)
+          ..insert(const {});
+        expect(delta.transformPosition(1), 1);
+      });
+
       test('insert at position', () {
         var delta = Delta()
           ..retain(2)
           ..insert('A');
+        expect(delta.transformPosition(2, force: false), 2);
+        expect(delta.transformPosition(2, force: true), 3);
+      });
+
+      test('insert (object) at position', () {
+        var delta = Delta()
+          ..retain(2)
+          ..insert(const {});
         expect(delta.transformPosition(2, force: false), 2);
         expect(delta.transformPosition(2, force: true), 3);
       });
@@ -836,6 +1105,18 @@ void main() {
               ..insert('B'))
             .slice(2, 3);
         var expected = Delta()..insert('A', {'bold': true});
+        expect(slice, expected);
+      });
+
+      test('start and end objects', () {
+        var slice = (Delta()
+              ..insert(const [1])
+              ..insert(const [2])
+              ..insert(const [3])
+              ..insert(const [4])
+              ..insert(const [5]))
+            .slice(2, 3);
+        var expected = Delta()..insert(const [3]);
         expect(slice, expected);
       });
 
