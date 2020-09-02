@@ -10,6 +10,7 @@ import 'package:collection/collection.dart';
 import 'package:quiver_hashcode/hashcode.dart';
 
 const _attributeEquality = DeepCollectionEquality();
+const _valueEquality = DeepCollectionEquality();
 
 /// Operation performed on a rich-text document.
 class Operation {
@@ -34,7 +35,7 @@ class Operation {
   final int length;
 
   /// Payload of "insert" operation, for other types is set to empty string.
-  final String data;
+  final dynamic data;
 
   /// Rich-text attributes set by this operation, can be `null`.
   Map<String, dynamic> get attributes =>
@@ -46,7 +47,7 @@ class Operation {
         assert(_validKeys.contains(key), 'Invalid operation key "$key".'),
         assert(() {
           if (key != Operation.insertKey) return true;
-          return data.length == length;
+          return data is String ? data.length == length : length == 1;
         }(), 'Length of insert operation must be equal to the text length.'),
         _attributes =
             attributes != null ? Map<String, dynamic>.from(attributes) : null;
@@ -55,9 +56,9 @@ class Operation {
   static Operation fromJson(data) {
     final map = Map<String, dynamic>.from(data);
     if (map.containsKey(Operation.insertKey)) {
-      final String text = map[Operation.insertKey];
-      return Operation._(
-          Operation.insertKey, text.length, text, map[Operation.attributesKey]);
+      final dynamic data = map[Operation.insertKey];
+      return Operation._(Operation.insertKey, data is String ? data.length : 1,
+          data, map[Operation.attributesKey]);
     } else if (map.containsKey(Operation.deleteKey)) {
       final int length = map[Operation.deleteKey];
       return Operation._(Operation.deleteKey, length, '', null);
@@ -81,8 +82,9 @@ class Operation {
       Operation._(Operation.deleteKey, length, '', null);
 
   /// Creates operation which inserts [text] with optional [attributes].
-  factory Operation.insert(String text, [Map<String, dynamic> attributes]) =>
-      Operation._(Operation.insertKey, text.length, text, attributes);
+  factory Operation.insert(dynamic data, [Map<String, dynamic> attributes]) =>
+      Operation._(Operation.insertKey, data is String ? data.length : 1, data,
+          attributes);
 
   /// Creates operation which retains [length] of characters and optionally
   /// applies attributes.
@@ -124,7 +126,7 @@ class Operation {
     Operation typedOther = other;
     return key == typedOther.key &&
         length == typedOther.length &&
-        data == typedOther.data &&
+        _valueEquality.equals(data, typedOther.data) &&
         hasSameAttributes(typedOther);
   }
 
@@ -149,7 +151,9 @@ class Operation {
   @override
   String toString() {
     final attr = attributes == null ? '' : ' + $attributes';
-    final text = isInsert ? data.replaceAll('\n', '⏎') : '$length';
+    final text = isInsert
+        ? (data is String ? data.replaceAll('\n', '⏎') : data.toString())
+        : '$length';
     return '$key⟨ $text ⟩$attr';
   }
 }
@@ -286,11 +290,11 @@ class Delta {
     push(Operation.retain(count, attributes));
   }
 
-  /// Insert [text] at current position.
-  void insert(String text, [Map<String, dynamic> attributes]) {
-    assert(text != null);
-    if (text.isEmpty) return; // no-op
-    push(Operation.insert(text, attributes));
+  /// Insert [data] at current position.
+  void insert(dynamic data, [Map<String, dynamic> attributes]) {
+    assert(data != null);
+    if (data is String && data.isEmpty) return; // no-op
+    push(Operation.insert(data, attributes));
   }
 
   /// Delete [count] characters from current position.
@@ -340,7 +344,9 @@ class Delta {
       }
 
       if (lastOp.isInsert && operation.isInsert) {
-        if (lastOp.hasSameAttributes(operation)) {
+        if (lastOp.hasSameAttributes(operation) &&
+            operation.data is String &&
+            lastOp.data is String) {
           _mergeWithTail(operation);
           return;
         }
@@ -629,9 +635,9 @@ class DeltaIterator {
       } else {
         _offset += actualLength;
       }
-      final opData = op.isInsert
+      final opData = op.isInsert && op.data is String
           ? op.data.substring(_currentOffset, _currentOffset + actualLength)
-          : '';
+          : op.data;
       final int opLength = (opData.isNotEmpty) ? opData.length : actualLength;
       return Operation._(opKey, opLength, opData, opAttributes);
     }
