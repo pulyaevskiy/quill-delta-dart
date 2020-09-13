@@ -1,3 +1,8 @@
+## 1.1.0
+
+* Changed insert operations to allow inserting dynamic object values. (#13)
+  Object values must be JSON-serializable.
+
 ## 1.0.2
 
 * Fix attributes comparison for operations when attributes have complex values (maps, lists).

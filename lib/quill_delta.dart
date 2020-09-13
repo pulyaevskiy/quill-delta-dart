@@ -48,7 +48,7 @@ class Operation {
         assert(() {
           if (key != Operation.insertKey) return true;
           return data is String ? data.length == length : length == 1;
-        }(), 'Length of insert operation must be equal to the text length.'),
+        }(), 'Length of insert operation must be equal to the data length.'),
         _attributes =
             attributes != null ? Map<String, dynamic>.from(attributes) : null;
 
