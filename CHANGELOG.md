@@ -1,3 +1,7 @@
+## 1.1.1
+
+* Fix iterator for custom embed objects (#14)
+
 ## 1.1.0
 
 * Changed insert operations to allow inserting dynamic object values. (#13)
