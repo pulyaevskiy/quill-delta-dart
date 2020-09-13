@@ -638,8 +638,11 @@ class DeltaIterator {
       final opData = op.isInsert && op.data is String
           ? op.data.substring(_currentOffset, _currentOffset + actualLength)
           : op.data;
-      final int opLength = (opData.isNotEmpty) ? opData.length : actualLength;
-      return Operation._(opKey, opLength, opData, opAttributes);
+      final opIsNotEmpty =
+          opData is String ? opData.isNotEmpty : true; // embeds are never empty
+      final opLength = opData is String ? opData.length : 1;
+      final int opActualLength = opIsNotEmpty ? opLength : actualLength;
+      return Operation._(opKey, opActualLength, opData, opAttributes);
     }
     return Operation.retain(length);
   }

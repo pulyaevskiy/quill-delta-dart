@@ -1145,11 +1145,12 @@ void main() {
     });
   });
 
-  group('$DeltaIterator', () {
+  group('DeltaIterator', () {
     var delta = Delta()
       ..insert('Hello', {'b': true})
       ..retain(3)
       ..insert(' world', {'i': true})
+      ..insert(Embed('hr'))
       ..delete(4);
     DeltaIterator iterator;
 
@@ -1159,7 +1160,7 @@ void main() {
 
     test('hasNext', () {
       expect(iterator.hasNext, isTrue);
-      iterator..next()..next()..next()..next();
+      iterator..next()..next()..next()..next()..next();
       expect(iterator.hasNext, isFalse);
     });
 
@@ -1169,6 +1170,8 @@ void main() {
       expect(iterator.peekLength(), 3);
       iterator.next();
       expect(iterator.peekLength(), 6);
+      iterator.next();
+      expect(iterator.peekLength(), 1);
       iterator.next();
       expect(iterator.peekLength(), 4);
       iterator.next();
@@ -1180,7 +1183,7 @@ void main() {
     });
 
     test('peekLength after EOF', () {
-      iterator.skip(18);
+      iterator.skip(19);
       expect(iterator.peekLength(), double.infinity);
     });
 
@@ -1188,6 +1191,8 @@ void main() {
       expect(iterator.isNextInsert, isTrue);
       iterator.next();
       expect(iterator.isNextRetain, isTrue);
+      iterator.next();
+      expect(iterator.isNextInsert, isTrue);
       iterator.next();
       expect(iterator.isNextInsert, isTrue);
       iterator.next();
@@ -1199,6 +1204,7 @@ void main() {
       expect(iterator.next(), Operation.insert('Hello', {'b': true}));
       expect(iterator.next(), Operation.retain(3));
       expect(iterator.next(), Operation.insert(' world', {'i': true}));
+      expect(iterator.next(), Operation.insert(Embed('hr')));
       expect(iterator.next(), Operation.delete(4));
     });
 
@@ -1209,4 +1215,23 @@ void main() {
       expect(iterator.next(2), Operation.retain(2));
     });
   });
+}
+
+class Embed {
+  final String data;
+
+  Embed(this.data);
+
+  @override
+  bool operator ==(dynamic other) {
+    if (identical(this, other)) return true;
+    if (other is! Embed) return false;
+    final typedOther = other as Embed;
+    return typedOther.data == data;
+  }
+
+  @override
+  int get hashCode => data.hashCode;
+
+  Map<String, dynamic> toJson() => {'data': data};
 }
