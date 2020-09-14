@@ -35,7 +35,7 @@ class Operation {
   final int length;
 
   /// Payload of "insert" operation, for other types is set to empty string.
-  final Object data;
+  final dynamic data;
 
   /// Rich-text attributes set by this operation, can be `null`.
   Map<String, dynamic> get attributes =>
@@ -152,9 +152,7 @@ class Operation {
   String toString() {
     final attr = attributes == null ? '' : ' + $attributes';
     final text = isInsert
-        ? (data is String
-            ? (data as String).replaceAll('\n', '⏎')
-            : data.toString())
+        ? (data is String ? data.replaceAll('\n', '⏎') : data.toString())
         : '$length';
     return '$key⟨ $text ⟩$attr';
   }
@@ -309,15 +307,12 @@ class Delta {
   void _mergeWithTail(Operation operation) {
     assert(isNotEmpty);
     assert(operation != null && last.key == operation.key);
-    assert(operation.data is String && last.data is String);
 
     final length = operation.length + last.length;
-    final lastText = last.data as String;
-    final opText = operation.data as String;
-    final resultText = lastText + opText;
+    final data = last.data + operation.data;
     final index = _operations.length;
     _operations.replaceRange(index - 1, index, [
-      Operation._(operation.key, length, resultText, operation.attributes),
+      Operation._(operation.key, length, data, operation.attributes),
     ]);
   }
 
@@ -641,8 +636,7 @@ class DeltaIterator {
         _offset += actualLength;
       }
       final opData = op.isInsert && op.data is String
-          ? (op.data as String)
-              .substring(_currentOffset, _currentOffset + actualLength)
+          ? op.data.substring(_currentOffset, _currentOffset + actualLength)
           : op.data;
       final opIsNotEmpty =
           opData is String ? opData.isNotEmpty : true; // embeds are never empty
