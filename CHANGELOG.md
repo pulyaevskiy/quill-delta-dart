@@ -1,3 +1,10 @@
+## 2.0.0
+
+* **Breaking change**: changed `Operation.value` type from `dynamic` to `Object` to allow better
+  static analysis and prevent bugs where operation value is always assumed to be a String object. 
+  If you get analyzer errors after this change you must add an explicit type cast on the
+  operation value to the desired type (String or the type of an embed).
+
 ## 1.1.3
 
 * Reverted last change to operation value type and will publish it as a major version update
