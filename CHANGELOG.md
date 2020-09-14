@@ -1,3 +1,9 @@
+## 1.1.2
+
+* Changed operation value type from `dynamic` to `Object` to allow better static analysis.
+  If you get analyzer errors after this change you must add an explicit type cast on the operation
+  value to the desired class.
+
 ## 1.1.1
 
 * Fix iterator for custom embed objects (#14)
