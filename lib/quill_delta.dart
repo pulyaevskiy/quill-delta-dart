@@ -12,6 +12,14 @@ import 'package:quiver_hashcode/hashcode.dart';
 const _attributeEquality = DeepCollectionEquality();
 const _valueEquality = DeepCollectionEquality();
 
+/// Decoder function to convert raw `data` object into a user-defined data type.
+///
+/// Useful with embedded content.
+typedef DataDecoder = Object Function(Object data);
+
+/// Default data decoder which simply passes through the original value.
+Object _passThroughDataDecoder(Object data) => data;
+
 /// Operation performed on a rich-text document.
 class Operation {
   /// Key of insert operations.
@@ -53,12 +61,17 @@ class Operation {
             attributes != null ? Map<String, dynamic>.from(attributes) : null;
 
   /// Creates new [Operation] from JSON payload.
-  static Operation fromJson(data) {
+  ///
+  /// If `dataDecoder` parameter is not null then it is used to additionally
+  /// decode the operation's data object. Only applied to insert operations.
+  static Operation fromJson(data, {DataDecoder dataDecoder}) {
+    dataDecoder ??= _passThroughDataDecoder;
     final map = Map<String, dynamic>.from(data);
     if (map.containsKey(Operation.insertKey)) {
-      final dynamic data = map[Operation.insertKey];
-      return Operation._(Operation.insertKey, data is String ? data.length : 1,
-          data, map[Operation.attributesKey]);
+      final data = dataDecoder(map[Operation.insertKey]);
+      final dataLength = data is String ? data.length : 1;
+      return Operation._(
+          Operation.insertKey, dataLength, data, map[Operation.attributesKey]);
     } else if (map.containsKey(Operation.deleteKey)) {
       final int length = map[Operation.deleteKey];
       return Operation._(Operation.deleteKey, length, '', null);
@@ -241,8 +254,16 @@ class Delta {
       Delta._(List<Operation>.from(other._operations));
 
   /// Creates [Delta] from de-serialized JSON representation.
-  static Delta fromJson(List data) {
-    return Delta._(data.map(Operation.fromJson).toList());
+  ///
+  /// If `dataDecoder` parameter is not null then it is used to additionally
+  /// decode the operation's data object. Only applied to insert operations.
+  static Delta fromJson(
+    List<Map<String, dynamic>> data, {
+    DataDecoder dataDecoder,
+  }) {
+    return Delta._(data
+        .map((op) => Operation.fromJson(op, dataDecoder: dataDecoder))
+        .toList());
   }
 
   /// Returns list of operations in this delta.
