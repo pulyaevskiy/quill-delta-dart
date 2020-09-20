@@ -4,9 +4,11 @@
   static analysis and prevent bugs where operation value is always assumed to be a String object. 
   If you get analyzer errors after this change you must add an explicit type cast on the
   operation value to the desired type (String or the type of an embed).
-* Added `dataDecoder` parameter to `Delta.fromJson` and `Operation.fromJson`. Can be used to convert
+* Added: `dataDecoder` parameter to `Delta.fromJson` and `Operation.fromJson`. Can be used to convert
   raw JSON values to concrete data types. Mainly useful with embedded data. Text data should always
-  be `String`. 
+  be `String`.
+* Fixed: changed `Delta.fromJson` type of the `data` parameter to `List` so that this factory method
+  can actually be used with the output of `jsonDecode`.
 
 ## 1.1.3
 

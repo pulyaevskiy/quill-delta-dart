@@ -64,7 +64,7 @@ class Operation {
   ///
   /// If `dataDecoder` parameter is not null then it is used to additionally
   /// decode the operation's data object. Only applied to insert operations.
-  static Operation fromJson(data, {DataDecoder dataDecoder}) {
+  static Operation fromJson(Map data, {DataDecoder dataDecoder}) {
     dataDecoder ??= _passThroughDataDecoder;
     final map = Map<String, dynamic>.from(data);
     if (map.containsKey(Operation.insertKey)) {
@@ -257,10 +257,7 @@ class Delta {
   ///
   /// If `dataDecoder` parameter is not null then it is used to additionally
   /// decode the operation's data object. Only applied to insert operations.
-  static Delta fromJson(
-    List<Map<String, dynamic>> data, {
-    DataDecoder dataDecoder,
-  }) {
+  static Delta fromJson(List data, {DataDecoder dataDecoder}) {
     return Delta._(data
         .map((op) => Operation.fromJson(op, dataDecoder: dataDecoder))
         .toList());
