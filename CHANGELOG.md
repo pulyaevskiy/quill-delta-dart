@@ -1,3 +1,7 @@
+## 3.0.0-nullsafety.0
+
+* Migrated to null safety.
+
 ## 2.0.0
 
 * **Breaking change**: changed `Operation.value` type from `dynamic` to `Object` to allow better
