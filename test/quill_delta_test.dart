@@ -1184,7 +1184,7 @@ void main() {
 
     test('peekLength after EOF', () {
       iterator.skip(19);
-      expect(iterator.peekLength(), double.infinity);
+      expect(iterator.peekLength(), DeltaIterator.maxLength);
     });
 
     test('peek operation type', () {
@@ -1213,6 +1213,11 @@ void main() {
       expect(iterator.next(10), Operation.insert('llo', {'b': true}));
       expect(iterator.next(1), Operation.retain(1));
       expect(iterator.next(2), Operation.retain(2));
+    });
+
+    test('next after EOF', () {
+      iterator.skip(19);
+      expect(iterator.next(), Operation.retain(DeltaIterator.maxLength));
     });
   });
 }

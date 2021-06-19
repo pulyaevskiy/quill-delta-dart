@@ -468,7 +468,7 @@ class Delta {
     } else {
       // Retain otherOp which is either retain or insert.
       return Operation.retain(
-        length as int,
+        length,
         transformAttributes(thisOp.attributes, otherOp.attributes, priority),
       );
     }
@@ -550,7 +550,7 @@ class Delta {
     var index = 0;
     var opIterator = DeltaIterator(this);
 
-    final actualEnd = end ?? double.infinity;
+    final actualEnd = end ?? DeltaIterator.maxLength;
 
     while (index < actualEnd && opIterator.hasNext) {
       Operation op;
@@ -599,10 +599,12 @@ class Delta {
 
 /// Specialized iterator for [Delta]s.
 class DeltaIterator {
+  static const int maxLength = 1073741824;
+
   final Delta delta;
   final int _modificationCount;
   int _index = 0;
-  num _offset = 0;
+  int _offset = 0;
 
   DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
@@ -620,24 +622,31 @@ class DeltaIterator {
     }
   }
 
-  bool get hasNext => peekLength() < double.infinity;
+  bool get hasNext => peekLength() < maxLength;
 
   /// Returns length of next operation without consuming it.
   ///
-  /// Returns [double.infinity] if there is no more operations left to iterate.
-  num peekLength() {
+  /// Returns [maxLength] if there is no more operations left to iterate.
+  int peekLength() {
     if (_index < delta.length) {
       final operation = delta._operations[_index];
       return operation.length - _offset;
     }
-    return double.infinity;
+    return maxLength;
   }
 
   /// Consumes and returns next operation.
   ///
   /// Optional [length] specifies maximum length of operation to return. Note
   /// that actual length of returned operation may be less than specified value.
-  Operation next([num length = double.infinity]) {
+  ///
+  /// If this iterator reached the end of the Delta then returns a retain
+  /// operation with its length set to [maxLength].
+  // TODO: Note that we used double.infinity as the default value for length here
+  //       but this can now cause a type error since operation length is
+  //       expected to be an int. Changing default length to [maxLength] is
+  //       a workaround to avoid breaking changes.
+  Operation next([int length = maxLength]) {
     if (_modificationCount != delta._modificationCount) {
       throw ConcurrentModificationError(delta);
     }
@@ -655,16 +664,16 @@ class DeltaIterator {
         _offset += actualLength;
       }
       final opData = op.isInsert && op.data is String
-          ? (op.data as String).substring(
-              _currentOffset as int, _currentOffset + (actualLength as int))
+          ? (op.data as String)
+              .substring(_currentOffset, _currentOffset + (actualLength))
           : op.data;
       final opIsNotEmpty =
           opData is String ? opData.isNotEmpty : true; // embeds are never empty
       final opLength = opData is String ? opData.length : 1;
-      final opActualLength = opIsNotEmpty ? opLength : actualLength as int;
+      final opActualLength = opIsNotEmpty ? opLength : actualLength;
       return Operation._(opKey, opActualLength, opData, opAttributes);
     }
-    return Operation.retain(length as int);
+    return Operation.retain(length);
   }
 
   /// Skips [length] characters in source delta.
