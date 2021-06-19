@@ -224,7 +224,7 @@ void main() {
 
     test('attributes immutable', () {
       var op = Operation.insert('\n', {'b': true});
-      var attrs = op.attributes;
+      var attrs = op.attributes!;
       attrs['b'] = null;
       expect(op.attributes, {'b': true});
     });
@@ -1152,7 +1152,7 @@ void main() {
       ..insert(' world', {'i': true})
       ..insert(Embed('hr'))
       ..delete(4);
-    DeltaIterator iterator;
+    late DeltaIterator iterator;
 
     setUp(() {
       iterator = DeltaIterator(delta);
@@ -1226,7 +1226,7 @@ class Embed {
   bool operator ==(dynamic other) {
     if (identical(this, other)) return true;
     if (other is! Embed) return false;
-    final typedOther = other as Embed;
+    final typedOther = other;
     return typedOther.data == data;
   }
 

@@ -1,3 +1,7 @@
+## 3.0.0-nullsafety.0
+
+* Migrated to null safety.
+
 ## 2.0.1
 
 * Updated dependency on quiver_hashcode to main quiver package.
@@ -5,7 +9,7 @@
 ## 2.0.0
 
 * **Breaking change**: changed `Operation.value` type from `dynamic` to `Object` to allow better
-  static analysis and prevent bugs where operation value is always assumed to be a String object. 
+  static analysis and prevent bugs where operation value is always assumed to be a String object.
   If you get analyzer errors after this change you must add an explicit type cast on the
   operation value to the desired type (String or the type of an embed).
 * Added: `dataDecoder` parameter to `Delta.fromJson` and `Operation.fromJson`. Can be used to convert
