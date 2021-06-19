@@ -105,7 +105,8 @@ class Operation {
 
   /// Returns value of this operation.
   ///
-  /// For insert operations this returns text, for delete and retain - length.
+  /// For insert operations this returns the data object, for delete and
+  /// retain - length.
   dynamic get value => (key == Operation.insertKey) ? data : length;
 
   /// Returns `true` if this is a delete operation.
