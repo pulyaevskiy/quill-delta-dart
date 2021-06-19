@@ -1,3 +1,7 @@
+## 2.0.1
+
+* Updated dependency on quiver_hashcode to main quiver package.
+
 ## 2.0.0
 
 * **Breaking change**: changed `Operation.value` type from `dynamic` to `Object` to allow better
