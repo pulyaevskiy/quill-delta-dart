@@ -467,15 +467,6 @@ class Delta {
     return result..trim();
   }
 
-  Delta chop() {
-    if (isEmpty) return this;
-    final lastOp = _operations[_operations.length - 1];
-    if (lastOp.isRetain && lastOp.attributes == null) {
-      _operations.removeLast();
-    }
-    return this;
-  }
-
   /// Returns a new lazy Iterable with elements that are created by calling f
   /// on each element of this Iterable in iteration order.
   ///
@@ -547,7 +538,7 @@ class Delta {
         length -= opLength;
       }
     });
-    return retDelta.chop();
+    return retDelta..trim();
   }
 
   /// Transforms next operation from [otherIter] against next operation in
