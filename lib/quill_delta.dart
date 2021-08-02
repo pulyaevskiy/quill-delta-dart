@@ -5,8 +5,10 @@
 library quill_delta;
 
 import 'dart:math' as math;
+import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:diff_match_patch/diff_match_patch.dart' as dmp;
 import 'package:quiver/core.dart';
 
 const _attributeEquality = DeepCollectionEquality();
@@ -16,6 +18,11 @@ const _valueEquality = DeepCollectionEquality();
 ///
 /// Useful with embedded content.
 typedef DataDecoder = Object Function(Object data);
+
+/// Predicate function
+///
+/// Useful in functional programming with [Delta]
+typedef Predicate<T> = T Function(Operation op);
 
 /// Default data decoder which simply passes through the original value.
 Object _passThroughDataDecoder(Object data) => data;
@@ -180,6 +187,9 @@ class Operation {
 /// "document delta". When delta includes also "retain" or "delete" operations
 /// it is a "change delta".
 class Delta {
+  // Placeholder char for embed in diff()
+  static final String _kNullCharacter = String.fromCharCode(0);
+
   /// Transforms two attribute sets.
   static Map<String, dynamic>? transformAttributes(
       Map<String, dynamic>? a, Map<String, dynamic>? b, bool priority) {
@@ -236,6 +246,21 @@ class Delta {
       return memo;
     }));
     return inverted;
+  }
+
+  static Map<String, dynamic>? diffAttributes(
+      Map<String, dynamic>? a, Map<String, dynamic>? b) {
+    a ??= const {};
+    b ??= const {};
+
+    final attributes = <String, dynamic>{};
+    (a.keys.toList()..addAll(b.keys)).forEach((key) {
+      if (a![key] != b![key]) {
+        attributes[key] = b.containsKey(key) ? b[key] : null;
+      }
+    });
+
+    return attributes.keys.isNotEmpty ? attributes : null;
   }
 
   final List<Operation> _operations;
@@ -440,6 +465,89 @@ class Delta {
       if (newOp != null) result.push(newOp);
     }
     return result..trim();
+  }
+
+  Delta chop() {
+    if (isEmpty) return this;
+    final lastOp = _operations[_operations.length - 1];
+    if (lastOp.isRetain && lastOp.attributes == null) {
+      _operations.removeLast();
+    }
+    return this;
+  }
+
+  /// Returns a new lazy Iterable with elements that are created by calling f
+  /// on each element of this Iterable in iteration order.
+  ///
+  /// Convenience method
+  Iterable<T> map<T>(Predicate<T> predicate) {
+    return _operations.map<T>(predicate);
+  }
+
+  /// Returns a [Delta] containing differences between 2 [Delta]s
+  ///
+  /// Useful when one wishes to display difference between 2 documents
+  Delta diff(Delta other) {
+    if (_operations.equals(other._operations)) {
+      return Delta();
+    }
+    final stringThis = map((op) {
+      if (op.isInsert) {
+        return op.data is String ? op.data : _kNullCharacter;
+      }
+      final prep = this == other ? 'on' : 'with';
+      throw ArgumentError('diff() call $prep non-document');
+    }).join();
+    final stringOther = other.map((op) {
+      if (op.isInsert) {
+        return op.data is String ? op.data : _kNullCharacter;
+      }
+      final prep = this == other ? 'on' : 'with';
+      throw ArgumentError('diff() call $prep non-document');
+    }).join();
+
+    final retDelta = Delta();
+    final diffResult = dmp.diff(stringThis, stringOther);
+    final thisIter = DeltaIterator(this);
+    final otherIter = DeltaIterator(other);
+
+    diffResult.forEach((dmp.Diff component) {
+      var length = component.text.length;
+      while (length > 0) {
+        var opLength = 0;
+        switch (component.operation) {
+          case dmp.DIFF_INSERT:
+            opLength = min(otherIter.peekLength(), length);
+            retDelta.push(otherIter.next(opLength));
+            break;
+          case dmp.DIFF_DELETE:
+            opLength = min(length, thisIter.peekLength());
+            thisIter.next(opLength);
+            retDelta.delete(opLength);
+            break;
+          case dmp.DIFF_EQUAL:
+            opLength = min(
+              min(thisIter.peekLength(), otherIter.peekLength()),
+              length,
+            );
+            final thisOp = thisIter.next(opLength);
+            final otherOp = otherIter.next(opLength);
+            if (thisOp.data == otherOp.data) {
+              retDelta.retain(
+                opLength,
+                diffAttributes(thisOp.attributes, otherOp.attributes),
+              );
+            } else {
+              retDelta
+                ..push(otherOp)
+                ..delete(opLength);
+            }
+            break;
+        }
+        length -= opLength;
+      }
+    });
+    return retDelta.chop();
   }
 
   /// Transforms next operation from [otherIter] against next operation in

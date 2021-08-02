@@ -1143,6 +1143,156 @@ void main() {
         expect(slice, expected);
       });
     });
+
+    group('diff', () {
+      test('insert', () {
+        final a = Delta()..insert('A');
+        final b = Delta()..insert('AB');
+        final expected = Delta()
+          ..retain(1)
+          ..insert('B');
+        expect(a.diff(b), expected);
+      });
+
+      test('delete', () {
+        final a = Delta()..insert('AB');
+        final b = Delta()..insert('A');
+        final expected = Delta()
+          ..retain(1)
+          ..delete(1);
+        expect(a.diff(b), expected);
+      });
+
+      test('retain', () {
+        final a = Delta()..insert('A');
+        final b = Delta()..insert('A');
+        final expected = Delta();
+        expect(a.diff(b), expected);
+      });
+
+      test('format', () {
+        final a = Delta()..insert('A');
+        final b = Delta()..insert('A', {'b': true});
+        final expected = Delta()..retain(1, {'b': true});
+        expect(a.diff(b), expected);
+      });
+
+      test('object attributes', () {
+        final a = Delta()
+          ..insert('A', {
+            'font': {'family': 'Helvetica', 'size': '15px'},
+          });
+        final b = Delta()
+          ..insert('A', {
+            'font': {'family': 'Helvetica', 'size': '15px'},
+          });
+        var expected = Delta();
+        expect(a.diff(b), expected);
+      });
+
+      test('embed integer match', () {
+        final a = Delta()..insert(1);
+        final b = Delta()..insert(1);
+        final expected = Delta();
+        expect(a.diff(b), expected);
+      });
+
+      test('embed integer mismatch', () {
+        final a = Delta()..insert(1);
+        final b = Delta()..insert(2);
+        final expected = Delta()
+          ..delete(1)
+          ..insert(2);
+        expect(a.diff(b), expected);
+      });
+
+      test('embed object match', () {
+        final a = Delta()..insert({'image': 'http://google.com'});
+        final b = Delta()..insert({'image': 'http://google.com'});
+        final expected = Delta();
+        expect(a.diff(b), expected);
+      });
+
+      test('embed object mismatch', () {
+        final a = Delta()
+          ..insert({
+            'image': 'http://google.com',
+            'alt': 'Overwrite',
+          });
+        final b = Delta()..insert({'image': 'http://google.com'});
+        var expected = Delta()
+          ..insert({'image': 'http://google.com'})
+          ..delete(1);
+        expect(a.diff(b), expected);
+      });
+
+      test('embed object change', () {
+        final a = Delta()..insert({'image': 'http://google.com'});
+        final b = Delta()..insert({'image': 'http://github.com'});
+        final expected = Delta()
+          ..insert({'image': 'http://github.com'})
+          ..delete(1);
+        expect(a.diff(b), expected);
+      });
+
+      test('embed false positive', () {
+        final a = Delta()..insert(1);
+        final b = Delta()
+          ..insert(
+              String.fromCharCode(0)); // Placeholder char for embed in diff()
+        final expected = Delta()
+          ..insert(String.fromCharCode(0))
+          ..delete(1);
+        expect(a.diff(b), expected);
+      });
+
+      test('error on non-documents', () {
+        final a = Delta()..insert('A');
+        final b = Delta()
+          ..retain(1)
+          ..insert('B');
+        expect(() => a.diff(b), throwsArgumentError);
+        expect(() => b.diff(a), throwsArgumentError);
+      });
+
+      test('inconvenient indexes', () {
+        final a = Delta()..insert('12', {'b': true})..insert('34', {'i': true});
+        final b = Delta()..insert('123', {'bg': 'red'});
+        final expected = Delta()
+          ..retain(2, {'b': null, 'bg': 'red'})
+          ..retain(1, {'i': null, 'bg': 'red'})
+          ..delete(1);
+        expect(a.diff(b), expected);
+      });
+
+      test('combination', () {
+        final a = Delta()
+          ..insert('Bad', {'bg': 'red'})
+          ..insert('cat', {'bg': 'blue'});
+        final b = Delta()
+          ..insert('Good', {'b': true})
+          ..insert('dog', {'i': true});
+        final expected = Delta()
+          ..insert('Good', {'b': true})
+          ..delete(2)
+          ..retain(1, {'i': true, 'bg': null})
+          ..delete(3)
+          ..insert('og', {'i': true});
+        expect(a.diff(b), expected);
+      });
+
+      test('same document', () {
+        final a = Delta()..insert('A')..insert('B', {'b': true});
+        final expected = Delta();
+        expect(a.diff(a), expected);
+      });
+
+      test('non-document', () {
+        final a = Delta()..insert('Test');
+        final b = Delta()..delete(4);
+        expect(() => a.diff(b), throwsArgumentError);
+      });
+    });
   });
 
   group('DeltaIterator', () {
