@@ -19,11 +19,6 @@ const _valueEquality = DeepCollectionEquality();
 /// Useful with embedded content.
 typedef DataDecoder = Object Function(Object data);
 
-/// Predicate function
-///
-/// Useful in functional programming with [Delta]
-typedef Predicate<T> = T Function(Operation op);
-
 /// Default data decoder which simply passes through the original value.
 Object _passThroughDataDecoder(Object data) => data;
 
@@ -248,6 +243,7 @@ class Delta {
     return inverted;
   }
 
+  /// Returns diff between two attribute sets
   static Map<String, dynamic>? diffAttributes(
       Map<String, dynamic>? a, Map<String, dynamic>? b) {
     a ??= const {};
@@ -467,12 +463,12 @@ class Delta {
     return result..trim();
   }
 
-  /// Returns a new lazy Iterable with elements that are created by calling f
-  /// on each element of this Iterable in iteration order.
+  /// Returns a new lazy Iterable with elements that are created by calling
+  /// f on each element of this Iterable in iteration order.
   ///
   /// Convenience method
-  Iterable<T> map<T>(Predicate<T> predicate) {
-    return _operations.map<T>(predicate);
+  Iterable<T> map<T>(T Function(Operation) f) {
+    return _operations.map<T>(f);
   }
 
   /// Returns a [Delta] containing differences between 2 [Delta]s
