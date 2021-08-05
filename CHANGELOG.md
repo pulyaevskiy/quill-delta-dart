@@ -1,3 +1,7 @@
+## 3.0.0-nullsafety.1
+
+* Added `Delta.diff` implementation (#24)
+
 ## 3.0.0-nullsafety.0
 
 * Migrated to null safety.
