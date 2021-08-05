@@ -10,6 +10,7 @@ environment:
 dependencies:
   collection: ^1.15.0
   quiver: ^3.0.0
+  diff_match_patch: ^0.4.1
 
 dev_dependencies:
   coverage: ^1.0.0
