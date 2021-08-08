@@ -1281,7 +1281,7 @@ void main() {
         expect(a.diff(b, cleanupSemantic: false), expected);
       });
 
-      test('cleanup semantics', () {
+      test('cleanup semantic', () {
         final a = Delta()
           ..insert('Bad', {'bg': 'red'})
           ..insert('cat', {'bg': 'blue'});
