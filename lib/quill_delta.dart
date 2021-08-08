@@ -474,7 +474,7 @@ class Delta {
   /// Returns a [Delta] containing differences between 2 [Delta]s
   ///
   /// Useful when one wishes to display difference between 2 documents
-  Delta diff(Delta other) {
+  Delta diff(Delta other, {bool cleanupSemantic = true}) {
     if (_operations.equals(other._operations)) {
       return Delta();
     }
@@ -495,6 +495,10 @@ class Delta {
 
     final retDelta = Delta();
     final diffResult = dmp.diff(stringThis, stringOther);
+    if (cleanupSemantic) {
+      dmp.DiffMatchPatch().diffCleanupSemantic(diffResult);
+    }
+
     final thisIter = DeltaIterator(this);
     final otherIter = DeltaIterator(other);
 
