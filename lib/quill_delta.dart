@@ -471,7 +471,15 @@ class Delta {
     return _operations.map<T>(f);
   }
 
-  /// Returns a [Delta] containing differences between 2 [Delta]s
+  /// Returns a [Delta] containing differences between 2 [Delta]s.
+  /// If [cleanupSemantic] is `true` (default), applies the following:
+  ///
+  /// The diff of "mouse" and "sofas" is
+  ///   [delete(1), insert("s"), retain(1), delete("u"), insert("fa"), retain(1), delete(1)].
+  /// While this is the optimum diff, it is difficult for humans to understand.
+  /// Semantic cleanup rewrites the diff, expanding it into a more intelligible format.
+  /// The above example would become: [(-1, "mouse"), (1, "sofas")].
+  /// (source: https://github.com/google/diff-match-patch/wiki/API)
   ///
   /// Useful when one wishes to display difference between 2 documents
   Delta diff(Delta other, {bool cleanupSemantic = true}) {
