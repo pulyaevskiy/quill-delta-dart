@@ -1,3 +1,7 @@
+## 3.0.0-nullsafety.2
+
+* Added an option to cleanup semantics in `Delta.diff`. See dartdoc for more details.
+
 ## 3.0.0-nullsafety.1
 
 * Added `Delta.diff` implementation (#24)
