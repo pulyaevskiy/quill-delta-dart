@@ -1278,6 +1278,20 @@ void main() {
           ..retain(1, {'i': true, 'bg': null})
           ..delete(3)
           ..insert('og', {'i': true});
+        expect(a.diff(b, cleanupSemantic: false), expected);
+      });
+
+      test('cleanup semantic', () {
+        final a = Delta()
+          ..insert('Bad', {'bg': 'red'})
+          ..insert('cat', {'bg': 'blue'});
+        final b = Delta()
+          ..insert('Good', {'b': true})
+          ..insert('dog', {'i': true});
+        final expected = Delta()
+          ..insert('Good', {'b': true})
+          ..insert('dog', {'i': true})
+          ..delete(6);
         expect(a.diff(b), expected);
       });
 
