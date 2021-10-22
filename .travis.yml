@@ -6,7 +6,6 @@ dart:
 
 script:
   - pub get
-  - pub run test -r expanded
   - dart format --set-exit-if-changed lib/
   - dart format --set-exit-if-changed test/
   - dartanalyzer --fatal-infos --fatal-warnings .

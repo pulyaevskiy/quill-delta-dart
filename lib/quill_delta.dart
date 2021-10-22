@@ -420,8 +420,10 @@ class Delta {
     if (thisIter.isNextDelete) return thisIter.next();
 
     final length = math.min(thisIter.peekLength(), otherIter.peekLength());
-    final thisOp = thisIter.next(length);
-    final otherOp = otherIter.next(length);
+    var thisOp = thisIter.next(length);
+    var otherOp = otherIter.next(length);
+    if (otherOp == DeltaIterator.end()) otherOp = Operation.retain(length);
+    if (thisOp == DeltaIterator.end()) thisOp = Operation.retain(length);
     assert(thisOp.length == otherOp.length);
 
     if (otherOp.isRetain) {
@@ -445,6 +447,10 @@ class Delta {
       // otherOp(delete) + thisOp(insert) => null
     }
     return null;
+  }
+
+  Delta migrate(List<Operation> Function(List<Operation>) migrateCb) {
+    return Delta._(migrateCb(toList()));
   }
 
   /// Composes this delta with [other] and returns new [Delta].
@@ -562,8 +568,10 @@ class Delta {
     }
 
     final length = math.min(thisIter.peekLength(), otherIter.peekLength());
-    final thisOp = thisIter.next(length);
-    final otherOp = otherIter.next(length);
+    var thisOp = thisIter.next(length);
+    var otherOp = otherIter.next(length);
+    if (thisOp == DeltaIterator.end()) thisOp = Operation.retain(length);
+    if (otherOp == DeltaIterator.end()) otherOp = Operation.retain(length);
     assert(thisOp.length == otherOp.length);
 
     // At this point only delete and retain operations are possible.
@@ -652,19 +660,17 @@ class Delta {
 
   /// Returns slice of this delta from [start] index (inclusive) to [end]
   /// (exclusive).
-  Delta slice(int start, [int? end]) {
+  Delta slice(int start, [int end = DeltaIterator.maxLength]) {
     final delta = Delta();
     var index = 0;
     var opIterator = DeltaIterator(this);
 
-    final actualEnd = end ?? DeltaIterator.maxLength;
-
-    while (index < actualEnd && opIterator.hasNext) {
+    while (index < end && opIterator.hasNext) {
       Operation op;
       if (index < start) {
         op = opIterator.next(start - index);
       } else {
-        op = opIterator.next(actualEnd - index);
+        op = opIterator.next(end - index);
         delta.push(op);
       }
       index += op.length;
@@ -704,14 +710,67 @@ class Delta {
   String toString() => _operations.join('\n');
 }
 
+class DocumentDelta extends Delta {
+  DocumentDelta() : super._(<Operation>[]);
+
+  DocumentDelta._(List<Operation> ops) : super._(ops) {
+    assert(_operations.every((element) => !element.isDelete));
+  }
+
+  /// Creates new [Delta] from [other].
+  DocumentDelta.from(DocumentDelta other)
+      : super._(List<Operation>.from(other._operations)) {
+    ;
+    assert(_operations.every((element) => !element.isDelete));
+  }
+
+  DocumentDelta.fromJson(List data, {DataDecoder? dataDecoder})
+      : super._(data
+            .map((op) => Operation.fromJson(op, dataDecoder: dataDecoder))
+            .toList()) {
+    assert(_operations.every((element) => !element.isDelete));
+  }
+
+  @override
+  DocumentDelta migrate(List<Operation> Function(List<Operation>) migrateCb) {
+    return DocumentDelta._(migrateCb(toList()));
+  }
+
+  @override
+  void delete(int count) {
+    throw 'Cannot delete in a DocumentDelta';
+  }
+
+  @override
+  DocumentDelta compose(Delta other) {
+    return DocumentDelta._(super.compose(other)._operations);
+  }
+}
+
 /// Specialized iterator for [Delta]s.
 class DeltaIterator {
   static const int maxLength = 1073741824;
 
   final Delta delta;
   final int _modificationCount;
-  int _index = 0;
-  int _offset = 0;
+
+  int _index = 0; // operation index
+  int _offset = 0; // offset in the current operation
+
+  // Makes an independent copy of this iterator
+  DeltaIterator clone() {
+    return DeltaIterator(delta)..resetTo(this);
+  }
+
+  // Reset the current iterator position to the provided iterator
+  void resetTo(DeltaIterator it) {
+    assert(delta == it.delta);
+    assert(_modificationCount == it._modificationCount);
+    _index = it._index;
+    _offset = it._offset;
+  }
+
+  static Operation end() => Operation.retain(maxLength);
 
   DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
@@ -731,6 +790,8 @@ class DeltaIterator {
 
   bool get hasNext => peekLength() < maxLength;
 
+  bool get hasPrevious => _index > 0 || _offset > 0;
+
   /// Returns length of next operation without consuming it.
   ///
   /// Returns [maxLength] if there is no more operations left to iterate.
@@ -742,51 +803,128 @@ class DeltaIterator {
     return maxLength;
   }
 
+  /// Returns length of previous operation without consuming it.
+  ///
+  /// Returns `-1` if we are at the beginning of the document
+  int peekPrevLength() {
+    if (_offset > 0) return _offset;
+    if (_index == 0) return -1;
+    assert(_index - 1 < delta.length);
+    final operation = delta._operations[_index - 1];
+    return operation.length;
+  }
+
   /// Consumes and returns next operation.
   ///
   /// Optional [length] specifies maximum length of operation to return. Note
   /// that actual length of returned operation may be less than specified value.
   ///
-  /// If this iterator reached the end of the Delta then returns a retain
-  /// operation with its length set to [maxLength].
-  // TODO: Note that we used double.infinity as the default value for length here
-  //       but this can now cause a type error since operation length is
-  //       expected to be an int. Changing default length to [maxLength] is
-  //       a workaround to avoid breaking changes.
+  /// If this iterator reached the end of the Delta then returns [end].
   Operation next([int length = maxLength]) {
     if (_modificationCount != delta._modificationCount) {
       throw ConcurrentModificationError(delta);
     }
 
-    if (_index < delta.length) {
-      final op = delta.elementAt(_index);
-      final opKey = op.key;
-      final opAttributes = op.attributes;
-      final _currentOffset = _offset;
-      final actualLength = math.min(op.length - _currentOffset, length);
-      if (actualLength == op.length - _currentOffset) {
-        _index++;
-        _offset = 0;
-      } else {
-        _offset += actualLength;
-      }
-      final opData = op.isInsert && op.data is String
-          ? (op.data as String)
-              .substring(_currentOffset, _currentOffset + (actualLength))
-          : op.data;
-      final opIsNotEmpty =
-          opData is String ? opData.isNotEmpty : true; // embeds are never empty
-      final opLength = opData is String ? opData.length : 1;
-      final opActualLength = opIsNotEmpty ? opLength : actualLength;
-      return Operation._(opKey, opActualLength, opData, opAttributes);
+    if (_index >= delta.length) {
+      return end();
     }
-    return Operation.retain(length);
+
+    final op = delta.elementAt(_index);
+    final opKey = op.key;
+    final opAttributes = op.attributes;
+    final currentOffset = _offset;
+    final actualLength = math.min(op.length - currentOffset, length);
+    assert(actualLength >= 0);
+
+    final opData = op.isInsert && op.data is String
+        ? (op.data as String)
+            .substring(currentOffset, currentOffset + (actualLength))
+        : op.data;
+    final opIsNotEmpty =
+        opData is String ? opData.isNotEmpty : true; // embeds are never empty
+    final opLength = opData is String ? opData.length : 1;
+    final opActualLength = opIsNotEmpty ? opLength : actualLength;
+    assert(opActualLength <= length);
+
+    if (actualLength == op.length - currentOffset) {
+      _index += 1;
+      _offset = 0;
+    } else {
+      _offset += actualLength;
+    }
+    return Operation._(opKey, opActualLength, opData, opAttributes);
+  }
+
+  /// Consumes and returns previous operation.
+  ///
+  /// Optional [length] specifies maximum length of operation to return. Note
+  /// that actual length of returned operation may be less than specified value.
+  ///
+  /// If this iterator reached the beginning of the Delta then returns [end]
+  Operation prev([int length = maxLength]) {
+    if (_modificationCount != delta._modificationCount) {
+      throw ConcurrentModificationError(delta);
+    }
+
+    if (_offset == 0) {
+      if (_index == 0) return end();
+      _index -= 1;
+      _offset = delta.elementAt(_index).length;
+    }
+
+    final op = delta.elementAt(_index);
+    final opKey = op.key;
+    final opAttributes = op.attributes;
+    final currentOffset = _offset;
+    final actualLength = math.min(currentOffset, length);
+
+    final opData = op.isInsert && op.data is String
+        ? (op.data as String).substring(currentOffset - actualLength, _offset)
+        : op.data;
+    final opIsNotEmpty =
+        opData is String ? opData.isNotEmpty : true; // embeds are never empty
+    final opLength = opData is String ? opData.length : 1;
+    final opActualLength = opIsNotEmpty ? opLength : actualLength;
+    assert(opActualLength <= length);
+    _offset = currentOffset - actualLength;
+    return Operation._(opKey, opActualLength, opData, opAttributes);
+  }
+}
+
+// Iterator specialized for Document Delta
+class DocumentDeltaIterator extends DeltaIterator {
+  int _docIndex = 0;
+
+  DocumentDeltaIterator._(Delta document) : super(document);
+
+  DocumentDeltaIterator(DocumentDelta document) : super(document);
+
+  // Returns the current global index of the delta
+  // For document delta, it is the offset in the document, for change delta
+  // it is the offset in the document this delta applies to.
+  //
+  // Note: Only `retain` and `insert` operations are accounted for, because
+  // `delete` operations do not produce new content after the delta is applied.
+  // If an hypothetical delta applies to a full document, the docIndex at the end
+  // is equal to the size of the document with the changes of the delta applied.
+  int get docIndex => _docIndex;
+
+  @override
+  DocumentDeltaIterator clone() {
+    return DocumentDeltaIterator._(delta)..resetTo(this);
+  }
+
+  // Reset the current iterator position to the provided iterator
+  @override
+  void resetTo(covariant DocumentDeltaIterator it) {
+    super.resetTo(it);
+    _docIndex = it._docIndex;
   }
 
   /// Skips [length] characters in source delta.
-  ///
+  /// if length is not specified it goes to the end of the delta.
   /// Returns last skipped operation, or `null` if there was nothing to skip.
-  Operation? skip(int length) {
+  Operation? skip([int length = DeltaIterator.maxLength]) {
     var skipped = 0;
     Operation? op;
     while (skipped < length && hasNext) {
@@ -796,5 +934,52 @@ class DeltaIterator {
       skipped += op.length;
     }
     return op;
+  }
+
+  /// Rewinds [length] characters in source delta.
+  /// if no length is specified it goes to the beginning of the delta
+  /// Returns last skipped operation, or `null` if there was nothing to rewind.
+  Operation? rewind([int length = DeltaIterator.maxLength]) {
+    var skipped = 0;
+    Operation? op;
+    while (skipped < length && hasPrevious) {
+      final opLength = peekPrevLength();
+      final skip = math.min(length - skipped, opLength);
+      op = prev(skip);
+      skipped += op.length;
+    }
+    return op;
+  }
+
+  @override
+  Operation prev([int length = DeltaIterator.maxLength]) {
+    final op = super.prev(length);
+    if (op == DeltaIterator.end()) return op;
+    if (op.isInsert || op.isRetain) {
+      _docIndex -= op.length;
+    }
+    return op;
+  }
+
+  @override
+  Operation next([int length = DeltaIterator.maxLength]) {
+    final op = super.next(length);
+    if (op == DeltaIterator.end()) return op;
+    if (op.isInsert || op.isRetain) {
+      _docIndex += op.length;
+    }
+    return op;
+  }
+
+  // Go to the specified index in the document
+  void goTo(int index) {
+    if (docIndex > index) {
+      final op = rewind(docIndex - index);
+      assert(op != DeltaIterator.end());
+    }
+    if (docIndex < index) {
+      final op = skip(index - docIndex);
+      assert(op != DeltaIterator.end());
+    }
   }
 }
