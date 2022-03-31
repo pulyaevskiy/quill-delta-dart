@@ -483,7 +483,8 @@ class Delta {
   ///
   /// Useful when one wishes to display difference between 2 documents
   Delta diff(Delta other, {bool cleanupSemantic = true}) {
-    if (_operations.equals(other._operations)) {
+    if (_operations == other._operations ||
+        _valueEquality.equals(_operations, other._operations)) {
       return Delta();
     }
     final stringThis = map((op) {
@@ -531,7 +532,8 @@ class Delta {
             );
             final thisOp = thisIter.next(opLength);
             final otherOp = otherIter.next(opLength);
-            if (thisOp.data == otherOp.data) {
+            if (thisOp.data == otherOp.data ||
+                _valueEquality.equals(thisOp.data, otherOp.data)) {
               retDelta.retain(
                 opLength,
                 diffAttributes(thisOp.attributes, otherOp.attributes),

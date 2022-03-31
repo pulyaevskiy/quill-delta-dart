@@ -1306,6 +1306,42 @@ void main() {
         final b = Delta()..delete(4);
         expect(() => a.diff(b), throwsArgumentError);
       });
+
+      test('insert a block above an embed', () {
+        // We're adding "index: n" as attributes to make sure that each line
+        // stays separated. Without these attributes, the empty "\n" would be
+        // merged with the first paragraph.
+
+        final a = Delta()
+          ..insert('Test\n', {'index': 0})
+          ..insert({'image': 'https://example.com/image.png'}, {'index': 1})
+          ..insert('aaaaaa\n', {'index': 2});
+        final b = Delta()
+          ..insert('Test\n', {'index': 0})
+          ..insert('\n', {'index': 0.5})
+          ..insert({'image': 'https://example.com/image.png'}, {'index': 1})
+          ..insert('aaaaaa\n', {'index': 2});
+        final expected = Delta()..retain(5)..insert('\n', {'index': 0.5});
+        expect(a.diff(b), expected);
+      });
+
+      test('insert a block below an embed', () {
+        // We're adding "index: n" as attributes to make sure that each line
+        // stays separated. Without these attributes, the empty "\n" would be
+        // merged with the first paragraph.
+
+        final a = Delta()
+          ..insert('Test\n', {'index': 0})
+          ..insert({'image': 'https://example.com/image.png'}, {'index': 1})
+          ..insert('aaaaaa\n', {'index': 2});
+        final b = Delta()
+          ..insert('Test\n', {'index': 0})
+          ..insert({'image': 'https://example.com/image.png'}, {'index': 1})
+          ..insert('\n', {'index': 1.5})
+          ..insert('aaaaaa\n', {'index': 2});
+        final expected = Delta()..retain(6)..insert('\n', {'index': 1.5});
+        expect(a.diff(b), expected);
+      });
     });
   });
 
