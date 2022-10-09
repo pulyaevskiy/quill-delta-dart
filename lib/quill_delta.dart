@@ -704,14 +704,79 @@ class Delta {
   String toString() => _operations.join('\n');
 }
 
+/// Skips [length] characters in source delta and returns contents of the last
+/// line up until [length]
+///
+/// Only makes sense to use on a document delta (containing only insert operations).
+List<Operation> skipToLineAt(DeltaIterator iter, int length) {
+  assert(length > 0);
+
+  final prefix = <Operation>[];
+
+  var skipped = 0;
+  while (skipped < length && iter.hasNext) {
+    final opLength = iter.peekLength();
+    final skip = math.min(length - skipped, opLength);
+    final op = iter.next(skip);
+    if (op.data is! String) {
+      prefix.add(op);
+    } else {
+      var text = op.data as String;
+      var pos = text.lastIndexOf('\n');
+      if (pos == -1) {
+        prefix.add(op);
+      } else {
+        prefix.clear();
+        prefix.add(Operation.insert(text.substring(pos + 1), op.attributes));
+      }
+    }
+    skipped += op.length;
+  }
+  return prefix;
+}
+
+/// Skips to the end of current line and returns all skipped operations
+/// including operation containing the newline character.
+///
+/// Only makes sense to use on a document delta (containing only insert operations).
+List<Operation> skipToEndOfLine(DeltaIterator iter) {
+  assert(iter.hasNext);
+
+  final result = <Operation>[];
+  while (iter.hasNext) {
+    final op = iter.peek();
+    if (op.data is! String) {
+      result.add(op);
+      iter.next();
+      continue;
+    }
+    final text = op.data as String;
+    final pos = text.indexOf('\n');
+    if (pos == -1) {
+      result.add(op);
+      iter.next();
+      continue;
+    }
+    result.add(iter.next(pos + 1));
+  }
+  return result;
+}
+
 /// Specialized iterator for [Delta]s.
 class DeltaIterator {
   static const int maxLength = 1073741824;
 
   final Delta delta;
   final int _modificationCount;
+
+  /// Index of the current operation in delta
   int _index = 0;
+
+  /// Offset within the current operation in delta
   int _offset = 0;
+
+  /// Position within the entire document represented by the delta.
+  int _pos = 0;
 
   DeltaIterator(this.delta) : _modificationCount = delta._modificationCount;
 
@@ -742,6 +807,15 @@ class DeltaIterator {
     return maxLength;
   }
 
+  Operation peek() {
+    if (_index < delta.length) {
+      final op = delta._operations[_index];
+      if (_offset == 0) return op;
+      return Operation._(op.key, op.length, op.data, op.attributes);
+    }
+    return Operation.retain(maxLength);
+  }
+
   /// Consumes and returns next operation.
   ///
   /// Optional [length] specifies maximum length of operation to return. Note
@@ -770,6 +844,9 @@ class DeltaIterator {
       } else {
         _offset += actualLength;
       }
+
+      _pos += actualLength;
+
       final opData = op.isInsert && op.data is String
           ? (op.data as String)
               .substring(_currentOffset, _currentOffset + (actualLength))
